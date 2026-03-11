@@ -1,0 +1,9 @@
+[
+  { "id": "verbose", "name": "Verbose Output", "icon": "\ud83d\udcdd", "description": "Produce detailed step-by-step output with reasoning." },
+  { "id": "strict", "name": "Strict Mode", "icon": "\ud83d\udee1\ufe0f", "description": "Enforce strict validation, fail on any warning." },
+  { "id": "retry-on-fail", "name": "Retry on Failure", "icon": "\ud83d\udd04", "description": "Automatically retry failed steps." },
+  { "id": "responsive-checks", "name": "Responsive", "icon": "\ud83d\udcd0", "description": "Validate responsive layouts and breakpoint behavior using the live browser and recordings." },
+  { "id": "mobile-checks", "name": "Mobile", "icon": "\ud83d\udcf1", "description": "Run a dedicated phone-sized viewport pass and capture mobile-specific behavior in the browser and recordings." },
+  { "id": "tablet-checks", "name": "Tablet/iPad", "icon": "\ud83d\udcbb", "description": "Run a dedicated tablet-sized viewport pass (1024x768) and capture tablet-specific layout issues in the browser and recordings." },
+  { "id": "report", "name": "Detailed Report", "icon": "\ud83d\udcca", "description": "Generate a comprehensive report." }
+]

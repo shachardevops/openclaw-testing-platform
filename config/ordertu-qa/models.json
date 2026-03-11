@@ -1,0 +1,6 @@
+[
+  { "id": "anthropic/claude-opus-4-6", "short": "Opus", "color": "#f472b6", "family": "anthropic" },
+  { "id": "anthropic/claude-sonnet-4-6", "short": "Sonnet", "color": "#c084fc", "family": "anthropic" },
+  { "id": "anthropic/claude-haiku-4-5", "short": "Haiku", "color": "#22d3ee", "family": "anthropic" },
+  { "id": "openai-codex/gpt-5.3-codex", "short": "GPT-5.3", "color": "#4ade80", "family": "openai" }
+]

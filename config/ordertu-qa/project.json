@@ -1,0 +1,48 @@
+{
+  "id": "ordertu-qa",
+  "name": "OrderTu QA Command Center",
+  "subtitle": "Multi-Agent Testing Platform",
+  "icon": "\u26a1",
+  "workspace": "/Users/shacharcohen/.openclaw/workspace/qa-dashboard",
+  "sessionManager": {
+    "scanIntervalMs": 10000,
+    "maxActiveSessions": 4,
+    "escalation": {
+      "staleThresholdMs": 180000,
+      "nudgeCooldownMs": 300000,
+      "swapThresholdMs": 480000,
+      "killThresholdMs": 900000
+    },
+    "orphanMaxAgeMs": 1800000
+  },
+  "targetApp": {
+    "name": "OrderTu",
+    "path": "/Users/shacharcohen/ordertu",
+    "command": "pnpm dev",
+    "port": 3000,
+    "logFile": "/Users/shacharcohen/.openclaw/workspace/qa-dashboard/app-server.log"
+  },
+  "orchestrator": {
+    "enabled": true,
+    "recoveryCooldownMs": 120000,
+    "maxControllerMessagesPerMinute": 6,
+    "aiConsultationEnabled": true,
+    "decisionMemoryFile": "memory/decision-memory.json"
+  },
+  "modelFallback": {
+    "enabled": true,
+    "errorPatterns": ["overloaded", "rate limit", "rate_limit", "429", "529", "capacity", "api is busy", "too many requests", "server_error", "service_unavailable", "Request timed out"],
+    "rules": [
+      { "from": "anthropic", "to": "openai-codex/gpt-5.3-codex" },
+      { "from": "openai", "to": "anthropic/claude-sonnet-4-6" }
+    ]
+  },
+  "messageTemplates": {
+    "run": "[dashboard-run]\nStart agent run for task: {taskId}\nBrowser profile: {profile}\nModel: {model}\n{skills}\n\nSESSION MANAGEMENT — CRITICAL:\n- Before spawning a new session, use sessions_list to check for existing sessions for this task\n- If an existing session for {taskId} exists, REUSE it with sessions_send instead of sessions_spawn\n- Only spawn a new session if none exists for this task\n- Never create duplicate sessions for the same task\n\nIMPORTANT REQUIREMENTS:\n1. Read ALL files in {workspace}/requirements/ FIRST — follow output-format.md, pre-run-checklist.md, bug-template.md, agent-learnings.md\n2. Read {workspace}/memory/ files to check known bugs and module notes from previous runs\n3. Update {workspace}/results/{taskId}.json to running immediately\n4. Follow the exact bug report format — Claude Code will use your output to fix issues\n5. After completing the run, update memory files (known-bugs.md, agent-issues.md, module-notes.md, run-log.md) BEFORE writing final result\n6. Use sessions_spawn now with the specified model (only if no existing session found).",
+    "cancel": "[dashboard-cancel]\nCancel agent run for task: {taskId}\nIf a spawned run/session is active for this agent, stop/kill it now.\nThen update {workspace}/results/{taskId}.json with status \"failed\" and a finding that it was cancelled by user.",
+    "modelSwap": "[dashboard-model-swap]\nIMPORTANT: Do NOT restart the task from scratch. Do NOT spawn a new session.\nThe model for task {taskId} hit an API error ({errorReason}).\n1. Use sessions_list to find the EXISTING session for {taskId}\n2. Send a message to that session telling it to switch model to {fallbackModel}\n3. If the session is dead, ONLY THEN spawn ONE new session with the new model\n4. Read {workspace}/results/{taskId}.json for current progress — continue from there\nNever create duplicate sessions.",
+    "nudge": "[dashboard-nudge]\nIMPORTANT: Do NOT restart the task. Do NOT spawn a new session.\nTask {taskId} appears stuck — no session activity for {staleMinutes} minutes.\n1. Use sessions_list to find the EXISTING session for {taskId}\n2. Send it a message via sessions_send: \"Continue your work on {taskId}. You appear to be stuck.\"\n3. If the session is dead: read {workspace}/results/{taskId}.json for current progress, spawn ONE new session and continue from that checkpoint\n4. Never create duplicate sessions\nCurrent model: {model}.",
+    "chat": "[dashboard-chat]\nUser message for task {taskId}:\n{message}",
+    "kill": "[dashboard-kill]\nKill/stop session for task {taskId}.\n1. Use sessions_list to find session {sessionId}\n2. Send it: \"STOP. Task terminated by dashboard.\"\n3. Update {workspace}/results/{taskId}.json status to 'failed' with reason 'killed by session manager'\n4. Do NOT spawn a replacement."
+  }
+}

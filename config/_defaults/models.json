@@ -1,0 +1,5 @@
+[
+  { "id": "anthropic/claude-opus-4-6", "short": "Opus", "color": "#f472b6" },
+  { "id": "anthropic/claude-sonnet-4-6", "short": "Sonnet", "color": "#c084fc" },
+  { "id": "anthropic/claude-haiku-4-5", "short": "Haiku", "color": "#22d3ee" }
+]

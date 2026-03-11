@@ -1,0 +1,97 @@
+{
+  "controllerSessionId": "33791e3c-b52c-4c65-9599-547ddf9e70c2",
+  "orchestratorSessionId": "4d704c00-55f2-4d5d-8d17-5e0a4f6926a1",
+  "mode": "profile-isolated",
+  "maxConcurrentPerProfile": 1,
+  "chromeAttachRequired": false,
+  "profiles": [
+    "openclaw",
+    "chrome"
+  ],
+  "loadBalancing": {
+    "enabled": true,
+    "strategy": "round-robin",
+    "models": [
+      "anthropic/claude-sonnet-4-6",
+      "openai-codex/gpt-5.3-codex"
+    ]
+  },
+  "rolePipeline": [
+    {
+      "task": "admin",
+      "profile": "openclaw",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    {
+      "task": "distributor",
+      "profile": "chrome",
+      "model": "openai-codex/gpt-5.3-codex"
+    },
+    {
+      "task": "buyer",
+      "profile": "openclaw",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    {
+      "task": "supplier",
+      "profile": "chrome",
+      "model": "openai-codex/gpt-5.3-codex"
+    },
+    {
+      "task": "threads",
+      "profile": "openclaw",
+      "model": "anthropic/claude-sonnet-4-6"
+    },
+    {
+      "task": "cross-portal",
+      "profile": "chrome",
+      "model": "openai-codex/gpt-5.3-codex"
+    }
+  ],
+  "specialistPipeline": {
+    "groupA_openclaw": [
+      {
+        "task": "navigator",
+        "model": "openai-codex/gpt-5.3-codex"
+      },
+      {
+        "task": "i18n",
+        "model": "anthropic/claude-sonnet-4-6"
+      },
+      {
+        "task": "a11y",
+        "model": "anthropic/claude-sonnet-4-6"
+      },
+      {
+        "task": "cross-consistency",
+        "model": "anthropic/claude-sonnet-4-6"
+      },
+      {
+        "task": "print-export",
+        "model": "openai-codex/gpt-5.3-codex"
+      }
+    ],
+    "groupB_chrome": [
+      {
+        "task": "security",
+        "model": "anthropic/claude-sonnet-4-6"
+      },
+      {
+        "task": "responsive",
+        "model": "openai-codex/gpt-5.3-codex"
+      },
+      {
+        "task": "crud",
+        "model": "openai-codex/gpt-5.3-codex"
+      },
+      {
+        "task": "performance",
+        "model": "openai-codex/gpt-5.3-codex"
+      },
+      {
+        "task": "realtime",
+        "model": "anthropic/claude-sonnet-4-6"
+      }
+    ]
+  }
+}

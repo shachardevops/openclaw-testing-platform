@@ -1,0 +1,5 @@
+[
+  { "id": "full-regression", "name": "Full Regression", "taskIds": ["story-0","story-1","story-2","story-3","story-4","story-5","story-6","story-7","story-8","story-9","story-11","story-12","story-13","story-14"] },
+  { "id": "smoke-test", "name": "Smoke Test", "taskIds": ["story-0", "story-1"] },
+  { "id": "buyer-flow", "name": "Buyer Flow", "taskIds": ["story-0", "story-1", "story-2"] }
+]
