@@ -28,5 +28,7 @@
   { "id": "story-14", "num": "14", "title": "Security & Access Control", "actor": "All Roles", "icon": "🔒",
     "desc": "Auth checks, RLS, XSS, input validation, RBAC", "defaultModel": "anthropic/claude-sonnet-4-6", "defaultSkills": [], "deps": ["story-0"] },
   { "id": "story-15", "num": "15", "title": "Exploratory UI Deep Dive", "actor": "All Roles", "icon": "🔍",
-    "desc": "Click every button/dropdown/link across all portals, discover untested UI, produce extension recommendations for Stories 0-14", "defaultModel": "anthropic/claude-sonnet-4-6", "defaultSkills": [], "deps": ["story-0"] }
+    "desc": "Click every button/dropdown/link across all portals, discover untested UI, produce extension recommendations for Stories 0-14", "defaultModel": "anthropic/claude-sonnet-4-6", "defaultSkills": [], "deps": ["story-0"] },
+  { "id": "story-16", "num": "16", "title": "Responsive UI & Mobile/Tablet Compliance", "actor": "All Roles", "icon": "📐",
+    "desc": "Verify all pages render correctly across mobile (375px), tablet (768px), and desktop (1280px+) breakpoints", "defaultModel": "anthropic/claude-sonnet-4-6", "defaultSkills": ["responsive-checks", "mobile-checks", "tablet-checks"], "deps": ["story-0"] }
 ]

@@ -40,11 +40,15 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
     }
 
     const t = TASKS.find(x => x.id === nextId);
-    // Clear previous result so we detect the fresh running→passed/failed transition
-    prevResultsRef.current = { ...prevResultsRef.current, [nextId]: { status: 'running' } };
     dispatch({ type: 'SET_ACTIVE_PIPELINE', data: { currentTaskId: nextId } });
     addLog('PIPELINE', `Running: S${t?.num ?? '?'} ${t?.title || nextId}`);
-    runTask(nextId);
+
+    // Await runTask so the result file is reset to "running" before any poll reads it.
+    // This eliminates the race where a stale "passed" result triggers false advancement.
+    await runTask(nextId);
+
+    // Only start watching for completion after the result file is confirmed reset
+    prevResultsRef.current = { ...prevResultsRef.current, [nextId]: { status: 'running' } };
   }, [TASKS, dispatch, addLog, runTask]);
 
   // Start a pipeline directly from task IDs (no lookup needed)

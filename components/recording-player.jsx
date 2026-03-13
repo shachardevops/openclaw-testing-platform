@@ -379,7 +379,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
       </div>
 
       {frames.length > 0 && (
-        <div className="grid grid-cols-1 gap-2 border-b border-border bg-card/15 px-3 py-2 md:grid-cols-3">
+        <div className="shrink-0 grid grid-cols-1 gap-2 border-b border-border bg-card/15 px-3 py-2 md:grid-cols-3 max-h-[140px] overflow-y-auto">
           {['desktop', 'tablet', 'mobile'].filter(vp => viewportSummary[vp].frames > 0 || currentViewport === vp).map((viewport) => {
             const summary = viewportSummary[viewport];
             const isActiveViewport = currentViewport === viewport;
@@ -440,7 +440,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
       )}
 
       {/* Video frame */}
-      <div className="flex-1 flex items-center justify-center overflow-hidden relative">
+      <div className="flex-1 flex items-center justify-center overflow-hidden relative min-h-[200px]">
         {frames.length > 0 ? (
           <img
             ref={imgRef}
@@ -590,7 +590,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
       </div>
 
       {/* Controls + Timeline */}
-      <div className="shrink-0 border-t border-border bg-card/30">
+      <div className="shrink-0 border-t border-border bg-card/30 max-h-[45%] flex flex-col overflow-hidden">
         {/* Transport controls */}
         <div className="px-3 py-2 flex items-center gap-3">
           <button
@@ -734,7 +734,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
           const summary = viewportSummary[viewport];
           return summary.findings.length > 0 || summary.appLogs.length > 0;
         }) && (
-          <div className="space-y-2 px-3 pb-3">
+          <div className="space-y-2 px-3 pb-3 overflow-y-auto min-h-0">
             {['desktop', 'tablet', 'mobile', 'shared'].map((viewport) => {
               const summary = viewportSummary[viewport];
               if (summary.findings.length === 0 && summary.appLogs.length === 0) return null;

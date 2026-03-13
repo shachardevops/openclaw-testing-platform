@@ -72,6 +72,17 @@ Track problems the QA agent encounters and how to handle them.
 - **Solution:** Inconclusive — needs manual verification
 - **Prevention:** If sign-out uses Supabase `signOut()` which is async, the redirect may happen after a delay or via navigation that the automated browser doesn't capture
 
+## 2026-03-11 — Admin vs non-admin password discrepancy (story-11 r1)
+- **Problem:** Admin user (test@example.com) uses password "121212" while buyer/supplier/distributor use "password" (reset during story-5 Docker restart fix).
+- **Impact:** Had to track two different passwords during multi-portal testing.
+- **Solution:** Check password with `curl` API before attempting browser login.
+- **Prevention:** Standardize all test user passwords after any password reset operation.
+
+## 2026-03-11 — Login form requires requestSubmit() for cross-session login (story-11 r1)
+- **Problem:** Filling email/password via `nativeInputValueSetter` and clicking Login button doesn't always trigger navigation. Using `form.requestSubmit()` after a 200ms delay is more reliable.
+- **Solution:** Use JS evaluate with `nativeInputValueSetter` + `form.requestSubmit()` for login flows.
+- **Prevention:** Always use `form.requestSubmit()` as the form submission method for login forms.
+
 ## 2026-03-11 — Viewport resize breaks prior refs (story-6 r5)
 - **Problem:** After resizing viewport from desktop to mobile (375x812) using `kind: resize`, all prior refs become invalid (new ref IDs assigned after re-render). Clicking a ref from a desktop snapshot at a mobile viewport causes a timeout.
 - **Impact:** Had to take fresh snapshots after every resize before interacting with elements.
@@ -83,3 +94,46 @@ Track problems the QA agent encounters and how to handle them.
 - **Root cause:** The app uses a CSS overflow container (e.g., `main` element with `overflow-y: auto`) rather than body-level scrolling. Setting `documentElement.scrollTop` has no effect.
 - **Solution:** For apps with custom scroll containers, use the `main` element: `document.querySelector('main').scrollTo(0, Y)` or use the accessibility tree snapshot to verify content is present in the DOM rather than relying on screenshot position.
 - **Prevention:** Always check which element has the scroll container. Use snapshot tree to verify content presence instead of pixel position.
+
+## 2026-03-11 — Supplier run intermittently bounces between supplier/admin/login contexts (story-12 r1)
+- **Problem:** After successful supplier login, clicking supplier action-item/order links intermittently timed out and/or redirected to `/en/auth/login` or admin routes.
+- **Impact:** Could not execute the full supplier workflow in one uninterrupted flow; run finalized with functional failure.
+- **Solution:** Worked around partially by re-authenticating and continuing with direct navigation, but instability persisted.
+- **Prevention:** For cross-portal stories, isolate by explicit sign-out before role switch and re-snapshot after each redirect; app side should harden role-route/session consistency.
+
+## 2026-03-11 — Model swap mid-run (story-12 r2)
+- **Problem:** API error during story-12 run triggered model swap from claude-opus-4-6 to gpt-5.3-codex mid-execution.
+- **Impact:** Minimal — run continued from checkpoint without losing state. Browser tab stayed active.
+- **Solution:** Continued from where left off (mobile responsive checks → tablet checks → report writing).
+- **Prevention:** No action needed; model swap protocol worked correctly.
+
+## 2026-03-11 — Hebrew locale navigation causes session redirect (story-12 r2)
+- **Problem:** After visiting `/he/admin/supplier-orders/new`, navigating back to English admin routes caused session to redirect to `/en/supplier` (supplier portal) or lose admin context.
+- **Impact:** Had to re-login to continue admin testing at tablet viewport.
+- **Solution:** Re-authenticate after locale switch and before viewport resize.
+- **Prevention:** Avoid rapid locale switching during responsive testing. Test Hebrew locale as a separate pass after completing English viewport tests.
+
+## story-13 run (2026-03-12)
+- **Browser tab closure mid-run:** Tab closed unexpectedly during tablet inventory test (gateway timeout). Sufficient coverage was obtained; wrote report with available data.
+- **Resize persistence:** Viewport resize (act kind=resize) does not persist when tab closes and new tab opens — new tabs default to 375x812 (the last mobile resize). Must call resize explicitly on every new tab.
+- **Auth session in new tab:** Auth session from previous tab carries over if opening the same origin (logged-in cookies preserved). No re-login needed when browser restarts within same session.
+- **Story-13 scope:** No explicit story definition found in any config file. Determined scope from context: follows story-12 (Admin Supplier Orders), covers Supplier Portal UX. Future runs should document story scope in a `stories-config.json` or similar.
+
+## 2026-03-12 — Story-15 has no pipeline config entry
+- **Problem:** story-15 was requested but has no formal definition in pipeline-config.json. Stories only go up to story-11 in the config.
+- **Impact:** No formal test plan to reference. Agent must infer scope from context.
+- **Solution:** Scoped as "Settings & Admin Tools" (untested modules: Metals, Automations, Activity Log, Trash) + all user/location management modules + comprehensive responsive passes.
+- **Note for future:** When story-15 (or any story above story-11) is requested, treat as an ad-hoc QA pass covering gaps from prior stories.
+
+## 2026-03-12 — Semi-mounts URL is /assembly-orders not /assembly
+- **Problem:** Navigating to `/en/admin/semi-mounts/assembly` returns 404.
+- **Solution:** Correct URL is `/en/admin/semi-mounts/assembly-orders`. Always check sidebar link href before navigating.
+- **Correct routes:**
+  - Assembly: `/en/admin/semi-mounts/assembly-orders`
+  - Rings: `/en/admin/semi-mounts/rings`
+  - Crowns: `/en/admin/semi-mounts/crowns`
+
+## 2026-03-12 — Mobile nav drawer scroll check
+- **Method to verify:** After opening the mobile nav drawer, use DOM evaluation to get `top` values for the last few nav items (Automations, Activity Log, Trash). If any are > viewport height (812px), they're unreachable.
+- **Confirmed:** At 375x812, Activity Log (841px) and Trash (881px) are unreachable.
+- **Check command:** `Array.from(document.querySelectorAll('a')).filter(a => a.href.match(/automation|activity|trash/)).map(a => ({text: a.textContent.trim(), top: Math.round(a.getBoundingClientRect().top)}))`

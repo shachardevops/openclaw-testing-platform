@@ -1276,7 +1276,7 @@ function TaskResultsList({ tasks, results, addLog }) {
 
                 {/* Inline recording player */}
                 {playingTaskId === t.id ? (
-                  <div className="border border-border rounded-lg overflow-hidden h-[400px] flex flex-col">
+                  <div className="border border-border rounded-lg overflow-hidden h-[600px] flex flex-col">
                     <RecordingPlayer
                       taskId={t.id}
                       jumpToFindingId={playingFindingId}

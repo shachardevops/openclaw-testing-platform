@@ -25,7 +25,9 @@ export default function PipelineBuilder() {
   const { tasks: TASKS, models: MODELS, skills: SKILLS, project } = useProjectConfig();
 
   const [selectedTasks, setSelectedTasks] = useState(() => new Set(TASKS.map(t => t.id)));
-  const [globalModel, setGlobalModel] = useState(MODELS[0]?.id || '');
+  const [globalModel, setGlobalModel] = useState(
+    () => MODELS.find(m => /sonnet/i.test(m.short))?.id || MODELS[0]?.id || ''
+  );
   const [selectedSkills, setSelectedSkills] = useState(new Set());
 
   // TASKS loads async — default to all selected once available
