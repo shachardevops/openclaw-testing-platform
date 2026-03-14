@@ -4,6 +4,8 @@ version: "3.8"
 # OpenClaw Testing Platform — Docker Compose
 # ============================================================================
 # Services:
+#   vector-service — Rust vector search microservice (TF-IDF + cosine similarity)
+#   audit-service  — Rust audit trail microservice (SHA-256 hash chains)
 #   ruvector-db    — RuVector PostgreSQL (vector DB with HNSW+GNN indexing)
 #   ruvector-ui    — pgAdmin web UI for managing the vector database
 #   ruvector-server — Standalone RuVector server (HNSW + GNN + SONA)
@@ -11,6 +13,68 @@ version: "3.8"
 # ============================================================================
 
 services:
+  # --------------------------------------------------------------------------
+  # Rust Vector Search Service
+  # --------------------------------------------------------------------------
+  # SIMD-accelerated TF-IDF embedding + cosine similarity search.
+  # Replaces the JS brute-force fallback in lib/vector-memory.js.
+  # --------------------------------------------------------------------------
+  vector-service:
+    build:
+      context: ./services/vector-service
+      dockerfile: Dockerfile
+    container_name: openclaw-vector-service
+    restart: unless-stopped
+    environment:
+      VECTOR_PORT: 4001
+      VECTOR_DIMENSIONS: ${RUVECTOR_DIMENSIONS:-384}
+      VECTOR_MAX_LEARNINGS: 5000
+      VECTOR_MAX_DECISIONS: 2000
+      VECTOR_MAX_PATTERNS: 3000
+      RUST_LOG: info
+    ports:
+      - "${VECTOR_SERVICE_PORT:-4001}:4001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - openclaw-net
+
+  # --------------------------------------------------------------------------
+  # Rust Audit Trail Service
+  # --------------------------------------------------------------------------
+  # SHA-256 hash-chained immutable event log with batch verification.
+  # Replaces the JS implementation in lib/audit-trail.js.
+  # --------------------------------------------------------------------------
+  audit-service:
+    build:
+      context: ./services/audit-service
+      dockerfile: Dockerfile
+    container_name: openclaw-audit-service
+    restart: unless-stopped
+    environment:
+      AUDIT_PORT: 4002
+      AUDIT_MAX_MEMORY_EVENTS: 2000
+      AUDIT_MAX_FILE_EVENTS: 10000
+      AUDIT_FLUSH_INTERVAL_SECS: 60
+      AUDIT_PERSIST_DIR: /data/memory
+      RUST_LOG: info
+    ports:
+      - "${AUDIT_SERVICE_PORT:-4002}:4002"
+    volumes:
+      - ./config/ordertu-qa/memory:/data/memory
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4002/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - openclaw-net
+
   # --------------------------------------------------------------------------
   # RuVector PostgreSQL — Vector Database
   # --------------------------------------------------------------------------

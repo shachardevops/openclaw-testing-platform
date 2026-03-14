@@ -1,6 +1,6 @@
 # OpenClaw Testing Platform
 
-Multi-agent QA dashboard that orchestrates [OpenClaw](https://github.com/openclaw) testing sessions. Built with Next.js 15 (App Router), React 19, and Tailwind CSS 4.
+Multi-agent QA dashboard that orchestrates [OpenClaw](https://github.com/openclaw) testing sessions. Built with Next.js 15 (App Router), React 19, Tailwind CSS 4, and TypeScript. Performance-critical subsystems (vector memory, audit trail) have optional Rust microservice backends.
 
 ## What It Does
 
@@ -11,6 +11,7 @@ The platform spawns and manages AI agents that run QA test stories against a tar
 - **Session management** — automatic escalation (nudge → model swap → kill) for stuck agents
 - **Live monitoring** — real-time log streaming, result polling, and drift detection
 - **Vector memory** — semantic search over past learnings, decisions, and patterns via RuVector
+- **Rust microservices** — optional high-performance vector-service and audit-service backends (axum/REST)
 - **Self-healing** — circuit breakers, retry with backoff, and automated recovery workflows
 
 ## How Everything Works Together
@@ -55,7 +56,7 @@ OpenClaw is the AI agent runtime. The dashboard acts as a **control plane** that
 User clicks "Run" in dashboard
   → POST /api/run-agent-start
   → Renders message template from project.json (e.g., "[dashboard-run] Task: login-flow...")
-  → lib/openclaw.js spawnAgent() — child_process.spawn(detached, unref)
+  → lib/openclaw.ts spawnAgent() — child_process.spawn(detached, unref)
   → OpenClaw CLI sends message to controller session via gateway
   → Controller spawns a sub-agent with the specified model
   → Sub-agent reads the test story (stories/{taskId}.md)
@@ -71,7 +72,7 @@ User clicks "Run" in dashboard
 
 ### 2. Orchestrator — Deterministic Session Management
 
-The orchestrator engine (`lib/orchestrator-engine.js`) runs a **30-second tick loop** that monitors all active agent sessions and takes corrective action.
+The orchestrator engine (`lib/orchestrator-engine.ts`) runs a **30-second tick loop** that monitors all active agent sessions and takes corrective action.
 
 **Three-layer decision architecture:**
 
@@ -239,11 +240,16 @@ Agent gets stuck      │ → orchestrator nudges → swaps model → kills
 ## Architecture
 
 ```
-UI (React 19)
+UI (React 19 + TypeScript)
   → API Routes (Next.js App Router, Node.js runtime)
-  → lib/openclaw.js (fire-and-forget child_process.spawn)
+  → lib/openclaw.ts (fire-and-forget child_process.spawn)
   → OpenClaw CLI writes results to ~/.openclaw/workspace/
   → Dashboard polls results every 2s → UI updates
+
+Rust Microservices (optional, Docker)
+  → vector-service (port 4001) — high-performance vector search
+  → audit-service (port 4002) — hash-chained audit trail
+  → JS fallback when services unavailable (vector-memory.js, audit-trail.js)
 
 RuVector DB (PostgreSQL + vector extensions via Docker)
   → Stores agent learnings, orchestrator decisions, QA patterns
@@ -258,8 +264,9 @@ RuVector DB (PostgreSQL + vector extensions via Docker)
 |------|---------|----------|
 | Node.js | 18+ | Yes |
 | pnpm | 9+ | Yes |
-| Docker | 24+ | For vector DB |
-| Docker Compose | 2.0+ | For vector DB |
+| Docker | 24+ | For vector DB + Rust services |
+| Docker Compose | 2.0+ | For vector DB + Rust services |
+| Rust | 1.75+ | Only if building Rust services locally |
 | OpenClaw CLI | latest | For agent execution |
 
 ## Quick Start
@@ -319,6 +326,8 @@ Once running, these services are available:
 | Service | URL | Description |
 |---------|-----|-------------|
 | QA Dashboard | http://localhost:3000 | Main application UI |
+| Vector Service | http://localhost:4001 | Rust vector search microservice |
+| Audit Service | http://localhost:4002 | Rust audit trail microservice |
 | Grafana | http://localhost:3001 | Vector collection monitoring & analytics |
 | pgAdmin | http://localhost:5050 | Database management UI |
 | RuVector Server | http://localhost:8080 | Vector search API |
@@ -351,6 +360,7 @@ pnpm dev          # Start dev server (localhost:3000)
 pnpm build        # Production build
 pnpm start        # Start production server
 pnpm lint         # Run ESLint
+pnpm type-check   # Run TypeScript type checking (tsc --noEmit)
 ```
 
 ## Project Structure
@@ -359,7 +369,7 @@ pnpm lint         # Run ESLint
 openclaw-testing-platform/
 ├── app/                    # Next.js App Router
 │   └── api/                # 30+ API routes (all Node.js runtime)
-├── components/             # React UI components
+├── components/             # React UI components (.tsx)
 ├── config/                 # Per-project configuration
 │   └── ordertu-qa/         # OrderTu project config
 │       ├── project.json    # Main project config
@@ -375,17 +385,27 @@ openclaw-testing-platform/
 │   └── grafana/            # Grafana provisioning
 │       ├── provisioning/   # Datasource + dashboard config
 │       └── dashboards/     # Pre-built dashboard JSON
-├── hooks/                  # Custom React hooks
-├── lib/                    # Core logic modules
-│   ├── openclaw.js         # CLI bridge (spawn/exec/list)
-│   ├── vector-memory.js    # RuVector integration
-│   ├── orchestrator-engine.js  # Deterministic decision engine
-│   ├── drift-detector.js   # Anti-drift monitoring
-│   ├── self-healing.js     # Circuit breaker + retry
-│   ├── security-validator.js   # Input validation
+├── hooks/                  # Custom React hooks (.ts)
+├── lib/                    # Core logic modules (.ts)
+│   ├── openclaw.ts         # CLI bridge (spawn/exec/list)
+│   ├── vector-memory.js    # RuVector integration (JS fallback + Rust proxy)
+│   ├── audit-trail.js      # Audit trail (JS fallback + Rust write-through)
+│   ├── service-client.ts   # Rust microservice client (health-check caching)
+│   ├── orchestrator-engine.ts  # Deterministic decision engine
+│   ├── drift-detector.ts   # Anti-drift monitoring
+│   ├── self-healing.ts     # Circuit breaker + retry
+│   ├── security-validator.ts   # Input validation
 │   └── ...                 # 15+ modules
+├── services/               # Rust microservices
+│   ├── vector-service/     # Vector search service (axum, port 4001)
+│   └── audit-service/      # Audit trail service (axum, port 4002)
+├── types/                  # Shared TypeScript type definitions
+│   ├── config.ts           # Project/task/model/skill types
+│   ├── state.ts            # Dashboard state types
+│   ├── results.ts          # Task result and finding types
+│   └── services.ts         # Rust service client types
 ├── stories/                # QA test story templates
-├── docker-compose.yml      # RuVector DB + UI + Server
+├── docker-compose.yml      # RuVector DB + UI + Server + Rust services
 ├── start.sh                # One-command startup script
 └── .env.example            # Environment variable template
 ```
@@ -461,9 +481,53 @@ SELECT * FROM collection_stats();
 SELECT * FROM _ruvector_health ORDER BY check_time DESC LIMIT 1;
 ```
 
+## Rust Microservices
+
+Two optional Rust microservices provide high-performance backends for vector memory and audit trail operations. The TypeScript codebase proxies requests through `lib/service-client.ts` with automatic fallback to the JS implementations when services are unavailable.
+
+### vector-service (port 4001)
+
+Handles vector insert, search, hybrid search, and keyword search operations. Built with axum and REST/JSON transport.
+
+```bash
+# Run via Docker
+docker compose up vector-service
+
+# Or build locally
+cd services/vector-service && cargo build --release
+```
+
+### audit-service (port 4002)
+
+Handles audit event recording, querying, chain verification, and task replay. Uses a write-through pattern: writes go to both Rust and JS simultaneously, reads use JS for consistency.
+
+```bash
+# Run via Docker
+docker compose up audit-service
+
+# Or build locally
+cd services/audit-service && cargo build --release
+```
+
+### Service Client Pattern
+
+`lib/service-client.ts` implements:
+- **Health-check caching** — checks service availability every 30s, caches result
+- **Timeout handling** — 5s default timeout with AbortController
+- **Graceful fallback** — returns `null` when service unavailable, JS code handles the rest
+
+### Fallback Behavior
+
+| Operation | Rust Available | Rust Unavailable |
+|-----------|---------------|-----------------|
+| Vector insert | Rust (fast) | JS in-memory TF-IDF |
+| Vector search | Rust (fast) | JS cosine brute-force |
+| Audit record | Rust + JS (write-through) | JS only |
+| Audit query | JS (canonical source) | JS only |
+
 ## Orchestrator Engine
 
-The deterministic decision engine (`lib/orchestrator-engine.js`) handles session health:
+The deterministic decision engine (`lib/orchestrator-engine.ts`) handles session health:
 
 | Layer | Approach | Description |
 |-------|----------|-------------|
