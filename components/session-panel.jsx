@@ -14,6 +14,7 @@ import { useOrchestrator } from '@/hooks/use-orchestrator';
 import AppLogTab from '@/components/app-log-tab';
 import DirectAITab from '@/components/direct-ai-tab';
 import SwarmTab from '@/components/swarm-tab';
+import KnowledgeGraphTab from '@/components/knowledge-graph-tab';
 import RecordingPlayer from '@/components/recording-player';
 
 /** Shared markdown components for consistent rendering */
@@ -154,6 +155,7 @@ const TABS = [
   { id: 'recordings', label: 'Recordings' },
   { id: 'log', label: 'Log' },
   { id: 'direct-ai', label: 'AI Router' },
+  { id: 'knowledge', label: 'Knowledge' },
   { id: 'tasks', label: 'Results' },
 ];
 
@@ -448,6 +450,9 @@ export default function SessionPanel() {
         </TabPane>
         <TabPane active={tab === 'direct-ai'} visited={visitedTabs.has('direct-ai')}>
           <DirectAITab />
+        </TabPane>
+        <TabPane active={tab === 'knowledge'} visited={visitedTabs.has('knowledge')}>
+          <KnowledgeGraphTab />
         </TabPane>
         <TabPane active={tab === 'tasks'} visited={visitedTabs.has('tasks')}>
           <TaskResultsList tasks={TASKS} results={results} addLog={addLog} />
