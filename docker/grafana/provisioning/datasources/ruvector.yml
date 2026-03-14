@@ -1,0 +1,19 @@
+apiVersion: 1
+
+datasources:
+  - name: RuVector PostgreSQL
+    type: postgres
+    access: proxy
+    url: ruvector-db:5432
+    user: ruvector
+    database: openclaw_vectors
+    isDefault: true
+    jsonData:
+      sslmode: disable
+      maxOpenConns: 10
+      maxIdleConns: 5
+      connMaxLifetime: 14400
+      postgresVersion: 1700  # PostgreSQL 17
+    secureJsonData:
+      password: ruvector_secret
+    editable: true

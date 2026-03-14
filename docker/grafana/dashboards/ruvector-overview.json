@@ -1,0 +1,213 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "title": "RuVector Health Status",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "rawSql": "SELECT check_time, extension_version, hnsw_available, pg_version FROM _ruvector_health ORDER BY check_time DESC LIMIT 1",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "hnsw_available" },
+            "properties": [
+              {
+                "id": "custom.displayMode",
+                "value": "color-text"
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "true": { "text": "ACTIVE", "color": "green" }, "false": { "text": "UNAVAILABLE", "color": "red" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "title": "Collection Overview",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 7, "w": 24, "x": 0, "y": 5 },
+      "targets": [
+        {
+          "rawSql": "SELECT * FROM collection_stats()",
+          "format": "table",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "has_hnsw" },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  { "type": "value", "options": { "true": { "text": "YES", "color": "green" }, "false": { "text": "NO", "color": "orange" } } }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "title": "Learnings — Row Count Over Time",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('hour', created_at) AS time, COUNT(*) AS count FROM learnings WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 4,
+      "title": "Decisions — Row Count Over Time",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('hour', created_at) AS time, COUNT(*) AS count FROM decisions WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Patterns — Row Count Over Time",
+      "type": "timeseries",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+      "targets": [
+        {
+          "rawSql": "SELECT date_trunc('hour', created_at) AS time, COUNT(*) AS count FROM patterns WHERE $__timeFilter(created_at) GROUP BY 1 ORDER BY 1",
+          "format": "time_series",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "fillOpacity": 20, "lineWidth": 2 }
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Recent Learnings",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "rawSql": "SELECT id, LEFT(text, 100) AS text_preview, project_id, task_id, metadata->>'type' AS type, created_at FROM learnings ORDER BY created_at DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Recent Decisions",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "rawSql": "SELECT id, LEFT(text, 100) AS text_preview, action, project_id, metadata->>'pattern' AS pattern, created_at FROM decisions ORDER BY created_at DESC LIMIT 20",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Learnings by Project",
+      "type": "piechart",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 28 },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(project_id, 'unknown') AS project, COUNT(*) AS count FROM learnings GROUP BY project_id ORDER BY count DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Patterns by Type",
+      "type": "piechart",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 28 },
+      "targets": [
+        {
+          "rawSql": "SELECT COALESCE(pattern_type, 'untyped') AS type, COUNT(*) AS count FROM patterns GROUP BY pattern_type ORDER BY count DESC",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Index Health",
+      "type": "table",
+      "datasource": { "type": "postgres", "uid": "" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 28 },
+      "targets": [
+        {
+          "rawSql": "SELECT indexname, tablename, pg_size_pretty(pg_relation_size(indexname::regclass)) AS index_size FROM pg_indexes WHERE tablename IN ('learnings', 'decisions', 'patterns') ORDER BY tablename, indexname",
+          "format": "table",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["ruvector", "openclaw", "vector-db"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "RuVector — Vector Memory Overview",
+  "uid": "ruvector-overview",
+  "version": 1
+}

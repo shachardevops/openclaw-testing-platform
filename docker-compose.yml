@@ -6,7 +6,8 @@ version: "3.8"
 # Services:
 #   ruvector-db    — RuVector PostgreSQL (vector DB with HNSW+GNN indexing)
 #   ruvector-ui    — pgAdmin web UI for managing the vector database
-#   openclaw-app   — Next.js QA dashboard (optional, can also run natively)
+#   ruvector-server — Standalone RuVector server (HNSW + GNN + SONA)
+#   grafana        — Monitoring dashboards for vector collections & health
 # ============================================================================
 
 services:
@@ -91,12 +92,42 @@ services:
     networks:
       - openclaw-net
 
+  # --------------------------------------------------------------------------
+  # Grafana — Monitoring & Visualization Dashboards
+  # --------------------------------------------------------------------------
+  # Pre-provisioned with RuVector PostgreSQL datasource and dashboards
+  # for vector collection stats, health monitoring, and search analytics.
+  # Access at http://localhost:3001
+  # --------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: openclaw-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_SERVER_HTTP_PORT: 3001
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    ports:
+      - "${GRAFANA_PORT:-3001}:3001"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      ruvector-db:
+        condition: service_healthy
+    networks:
+      - openclaw-net
+
 volumes:
   ruvector-data:
     driver: local
   ruvector-index-data:
     driver: local
   pgadmin-data:
+    driver: local
+  grafana-data:
     driver: local
 
 networks:

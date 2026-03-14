@@ -122,9 +122,76 @@ start_docker() {
     warn "RuVector Server health check timed out (may still be starting)"
   fi
 
+  # Verify RuVector extension installation (#175 guard)
+  verify_ruvector_extension
+
   ok "pgAdmin UI available at http://localhost:${PGADMIN_PORT:-5050}"
+  ok "Grafana dashboards at http://localhost:${GRAFANA_PORT:-3001}"
   ok "RuVector DB available at localhost:${RUVECTOR_DB_PORT:-5433}"
   ok "RuVector Server available at http://localhost:${RUVECTOR_SERVER_PORT:-8080}"
+}
+
+# ── RuVector Extension Verification ─────────────────────────────────────────
+# Guards against known issues:
+#   #175 — Docker image missing ruvector--2.0.0.sql (extension install broken)
+#   #171 — HNSW hardcoded dimensions bug (fixed in 2.0.2+)
+#   #164 — HNSW segfault on large tables (fixed in 2.0.2+)
+#   #152 — HNSW errors on non-vector queries (fixed in 2.0.2+)
+
+verify_ruvector_extension() {
+  header "RuVector Extension Verification"
+
+  local db_port="${RUVECTOR_DB_PORT:-5433}"
+  local db_user="${RUVECTOR_DB_USER:-ruvector}"
+  local db_name="${RUVECTOR_DB_NAME:-openclaw_vectors}"
+
+  # Check if psql is available (not required, just for verification)
+  if ! command -v psql &>/dev/null; then
+    log "psql not installed locally — skipping extension verification"
+    log "You can verify manually: docker exec openclaw-ruvector-db psql -U $db_user -d $db_name -c \"SELECT extversion FROM pg_extension WHERE extname='ruvector';\""
+    return 0
+  fi
+
+  # Try to check extension version
+  local ext_version
+  ext_version=$(PGPASSWORD="${RUVECTOR_DB_PASSWORD:-ruvector_secret}" psql -h localhost -p "$db_port" -U "$db_user" -d "$db_name" -t -A -c "SELECT extversion FROM pg_extension WHERE extname='ruvector';" 2>/dev/null || echo "")
+
+  if [ -z "$ext_version" ]; then
+    warn "RuVector extension not detected — may be #175 (missing SQL file)"
+    warn "Check Docker image version: docker exec openclaw-ruvector-db cat /usr/share/postgresql/*/extension/ruvector.control"
+    warn "Vector search will fall back to sequential scan (slower but functional)"
+    return 0
+  fi
+
+  ok "RuVector extension version: $ext_version"
+
+  # Version check — warn about known buggy versions
+  case "$ext_version" in
+    0.*)
+      warn "RuVector $ext_version is outdated. Known issues:"
+      warn "  #171 — HNSW returns fewer results than requested"
+      warn "  #164 — HNSW segfault on tables >100K rows"
+      warn "  #152 — COUNT(*) crashes with HNSW indexes"
+      warn "Upgrade to ruvnet/ruvector-postgres:2.0.3+ recommended"
+      ;;
+    2.0.0|2.0.1)
+      warn "RuVector $ext_version has known bugs (#152, #164, #171)"
+      warn "Upgrade to 2.0.2+ and run: SELECT rebuild_all_indexes();"
+      ;;
+    *)
+      ok "RuVector version $ext_version — known critical bugs are fixed"
+      ;;
+  esac
+
+  # Check HNSW index availability
+  local hnsw_ok
+  hnsw_ok=$(PGPASSWORD="${RUVECTOR_DB_PASSWORD:-ruvector_secret}" psql -h localhost -p "$db_port" -U "$db_user" -d "$db_name" -t -A -c "SELECT hnsw_available FROM _ruvector_health ORDER BY check_time DESC LIMIT 1;" 2>/dev/null || echo "")
+
+  if [ "$hnsw_ok" = "t" ]; then
+    ok "HNSW vector indexes are active"
+  elif [ "$hnsw_ok" = "f" ]; then
+    warn "HNSW indexes not available — vector queries will use sequential scan"
+  fi
 }
 
 stop_docker() {
@@ -248,7 +315,7 @@ show_status() {
   # Docker services
   echo -e "${CYAN}Docker Services:${NC}"
   if command -v docker &>/dev/null; then
-    for container in openclaw-ruvector-db openclaw-ruvector-server openclaw-ruvector-ui; do
+    for container in openclaw-ruvector-db openclaw-ruvector-server openclaw-ruvector-ui openclaw-grafana; do
       local status
       status=$(docker inspect --format='{{.State.Status}} ({{.State.Health.Status}})' "$container" 2>/dev/null || echo "not running")
       if [[ "$status" == *"running"* ]]; then
@@ -327,7 +394,7 @@ main() {
       echo ""
       echo "Options:"
       echo "  (none)       Start everything (Docker + workspace + app)"
-      echo "  --docker     Start only Docker services (RuVector DB, UI, Server)"
+      echo "  --docker     Start only Docker services (RuVector DB, UI, Server, Grafana)"
       echo "  --app        Start only the Next.js dashboard"
       echo "  --stop       Stop all services"
       echo "  --status     Show status of all services"
