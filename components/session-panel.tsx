@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useDashboard } from '@/context/dashboard-context';
 import { useProjectConfig } from '@/context/project-config-context';
@@ -16,42 +16,140 @@ import DirectAITab from '@/components/direct-ai-tab';
 import SwarmTab from '@/components/swarm-tab';
 import KnowledgeGraphTab from '@/components/knowledge-graph-tab';
 import RecordingPlayer from '@/components/recording-player';
+import type { Finding as CanonicalFinding } from '@/types/results';
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
+interface MdComponentProps {
+  children?: React.ReactNode;
+  className?: string;
+}
+
+interface TaskOption {
+  id: string;
+  label: string;
+  status: string;
+  icon: string;
+}
+
+interface TaskDef {
+  id: string;
+  num: number;
+  title: string;
+  icon?: string;
+  actor?: string;
+  desc?: string;
+  defaultModel?: string;
+  deps?: string[];
+}
+
+// Extend canonical Finding with extra fields used by the dashboard UI
+interface Finding extends CanonicalFinding {
+  page?: string;
+  module?: string;
+  viewport?: string;
+  system?: boolean;
+}
+
+// Result data from dashboard context — loosely typed since the JSON shape varies
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ResultData = Record<string, any>;
+
+interface LogEntry {
+  time: string;
+  agent: string;
+  msg: string;
+  type?: string;
+}
+
+interface ManagedSessionData {
+  sessionId?: string;
+  taskId?: string;
+  isController?: boolean;
+  status?: string;
+  lastActivityTs?: number;
+  updatedAt?: number;
+  [key: string]: unknown;
+}
+
+interface SessionHistoryEntryData {
+  id?: string;
+  kind?: string;
+  text?: string;
+  timestamp?: string;
+  parts?: EntryPart[];
+  toolName?: string;
+  truncated?: boolean;
+  provider?: string;
+  modelId?: string;
+  newSessionId?: string;
+  [key: string]: unknown;
+}
+
+interface EntryPart {
+  type: string;
+  text?: string;
+  fullText?: string;
+  name?: string;
+  inputPreview?: string;
+}
+
+interface RecordingInfo {
+  taskId: string;
+  startedAt?: string;
+  durationMs?: number;
+  frameCount?: number;
+  findingCount?: number;
+  active?: boolean;
+  isActive?: boolean;
+}
+
+interface RecordingStatusData {
+  recording?: boolean;
+  frameCount?: number;
+}
+
+interface FileInfo {
+  name: string;
+  type?: string;
+  content?: string;
+  modified?: string;
+  size?: number;
+  fileCount?: number;
+  files?: string[];
+}
 
 /** Shared markdown components for consistent rendering */
-const mdComponents: Record<string, React.ComponentType<any>> = {
-  h1: ({ children }: any) => <h1 className="text-base font-bold text-zinc-100 mt-3 mb-1.5">{children}</h1>,
-  h2: ({ children }: any) => <h2 className="text-sm font-bold text-zinc-100 mt-2.5 mb-1">{children}</h2>,
-  h3: ({ children }: any) => <h3 className="text-[13px] font-semibold text-zinc-200 mt-2 mb-1">{children}</h3>,
-  p: ({ children }: any) => <div className="text-[13px] text-zinc-300 leading-relaxed mb-1.5">{children}</div>,
-  strong: ({ children }: any) => <strong className="font-semibold text-zinc-100">{children}</strong>,
-  em: ({ children }: any) => <em className="text-zinc-400">{children}</em>,
-  ul: ({ children }: any) => <ul className="list-disc pl-5 mb-1.5 space-y-0.5">{children}</ul>,
-  ol: ({ children }: any) => <ol className="list-decimal pl-5 mb-1.5 space-y-0.5">{children}</ol>,
-  li: ({ children }: any) => <li className="text-[13px] text-zinc-300 leading-relaxed">{children}</li>,
-  pre: ({ children }: any) => (
+const mdComponents: Record<string, React.ComponentType<MdComponentProps>> = {
+  h1: ({ children }: MdComponentProps) => <h1 className="text-base font-bold text-zinc-100 mt-3 mb-1.5">{children}</h1>,
+  h2: ({ children }: MdComponentProps) => <h2 className="text-sm font-bold text-zinc-100 mt-2.5 mb-1">{children}</h2>,
+  h3: ({ children }: MdComponentProps) => <h3 className="text-[13px] font-semibold text-zinc-200 mt-2 mb-1">{children}</h3>,
+  p: ({ children }: MdComponentProps) => <div className="text-[13px] text-zinc-300 leading-relaxed mb-1.5">{children}</div>,
+  strong: ({ children }: MdComponentProps) => <strong className="font-semibold text-zinc-100">{children}</strong>,
+  em: ({ children }: MdComponentProps) => <em className="text-zinc-400">{children}</em>,
+  ul: ({ children }: MdComponentProps) => <ul className="list-disc pl-5 mb-1.5 space-y-0.5">{children}</ul>,
+  ol: ({ children }: MdComponentProps) => <ol className="list-decimal pl-5 mb-1.5 space-y-0.5">{children}</ol>,
+  li: ({ children }: MdComponentProps) => <li className="text-[13px] text-zinc-300 leading-relaxed">{children}</li>,
+  pre: ({ children }: MdComponentProps) => (
     <pre className="bg-[#0a0a14] border border-border rounded-lg px-3 py-2 overflow-x-auto my-1.5">{children}</pre>
   ),
-  code: ({ className, children }: any) => {
+  code: ({ className, children }: MdComponentProps) => {
     if (className?.startsWith('language-')) {
       return <code className="text-[11px] text-zinc-300 font-mono leading-snug">{children}</code>;
     }
     return <code className="bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded text-[12px] font-mono">{children}</code>;
   },
-  blockquote: ({ children }: any) => (
+  blockquote: ({ children }: MdComponentProps) => (
     <blockquote className="border-l-2 border-zinc-600 pl-3 text-zinc-400 italic my-1.5">{children}</blockquote>
   ),
-  a: ({ children }: any) => <span className="text-accent underline">{children}</span>,
+  a: ({ children }: MdComponentProps) => <span className="text-accent underline">{children}</span>,
   hr: () => <hr className="border-border my-2" />,
-  table: ({ children }: any) => (
+  table: ({ children }: MdComponentProps) => (
     <div className="overflow-x-auto my-2">
       <table className="w-full text-[12px] border-collapse">{children}</table>
     </div>
   ),
-  thead: ({ children }: any) => <thead className="border-b border-border">{children}</thead>,
-  th: ({ children }: any) => <th className="text-left px-2 py-1.5 text-zinc-400 font-medium text-[11px]">{children}</th>,
-  td: ({ children }: any) => <td className="px-2 py-1 text-zinc-300 border-t border-border/50">{children}</td>,
+  thead: ({ children }: MdComponentProps) => <thead className="border-b border-border">{children}</thead>,
+  th: ({ children }: MdComponentProps) => <th className="text-left px-2 py-1.5 text-zinc-400 font-medium text-[11px]">{children}</th>,
+  td: ({ children }: MdComponentProps) => <td className="px-2 py-1 text-zinc-300 border-t border-border/50">{children}</td>,
 };
 
 /** Keep visited tabs mounted but hidden for instant switching */
@@ -81,11 +179,11 @@ const SYSTEM_FINDING_IDS = new Set(['stale-timeout', 'cancelled-by-user', 'agent
 const MOBILE_VIEWPORT_PATTERNS = /\bmobile\b|\bphone\b|\biphone\b|\bandroid\b|\bsmall screen\b/i;
 const DESKTOP_VIEWPORT_PATTERNS = /\bdesktop\b|\blarge screen\b|\bwide screen\b/i;
 
-function isSystemFinding(f: any) {
-  return SYSTEM_FINDING_IDS.has(f.id) || f.system === true;
+function isSystemFinding(f: Finding) {
+  return SYSTEM_FINDING_IDS.has(f.id || '') || f.system === true;
 }
 
-function normalizeViewportBucket(value: string | undefined | null): string {
+function normalizeViewportBucket(value: unknown): string {
   const raw = String(value || '').toLowerCase();
   if (!raw) return 'shared';
   if (raw.includes('mobile') || raw.includes('phone')) return 'mobile';
@@ -93,7 +191,7 @@ function normalizeViewportBucket(value: string | undefined | null): string {
   return 'shared';
 }
 
-function inferFindingViewport(finding: any): string {
+function inferFindingViewport(finding: Finding): string {
   const explicit = normalizeViewportBucket(finding?.viewport);
   if (explicit !== 'shared') return explicit;
 
@@ -114,12 +212,12 @@ function inferFindingViewport(finding: any): string {
   return 'shared';
 }
 
-function viewportLabel(bucket: string): string {
+function viewportLabel(bucket: string) {
   return bucket === 'mobile' ? 'Mobile' : bucket === 'desktop' ? 'Desktop' : 'Shared';
 }
 
-function groupFindingsByViewport(findings: any[]) {
-  return findings.reduce((acc: Record<string, any[]>, finding: any) => {
+function groupFindingsByViewport(findings: Finding[]): Record<string, Finding[]> {
+  return findings.reduce((acc: Record<string, Finding[]>, finding) => {
     acc[inferFindingViewport(finding)].push(finding);
     return acc;
   }, { desktop: [], mobile: [], shared: [] });
@@ -173,12 +271,12 @@ export default function SessionPanel() {
     return localStorage.getItem('oc-active-tab') || 'output';
   });
   // Track visited tabs so they stay mounted (hidden) after first visit
-  const [visitedTabs, setVisitedTabs] = useState(() => new Set([
+  const [visitedTabs, setVisitedTabs] = useState<Set<string>>(() => new Set([
     typeof window === 'undefined' ? 'output' : (localStorage.getItem('oc-active-tab') || 'output')
   ]));
-  const [tabLoading, setTabLoading] = useState({});
+  const [tabLoading, setTabLoading] = useState<Record<string, boolean>>({});
   const [tabTransitioning, setTabTransitioning] = useState(false);
-  const setTab = useCallback((id) => {
+  const setTab = useCallback((id: string) => {
     setTabTransitioning(true);
     _setTab(id);
     setVisitedTabs(prev => { const next = new Set(prev); next.add(id); return next; });
@@ -187,24 +285,24 @@ export default function SessionPanel() {
       requestAnimationFrame(() => setTabTransitioning(false));
     });
   }, []);
-  const setTabBusy = useCallback((id, isLoading) => {
+  const setTabBusy = useCallback((id: string, isLoading: boolean) => {
     setTabLoading((prev) => {
       if (prev[id] === isLoading) return prev;
       return { ...prev, [id]: isLoading };
     });
   }, []);
-  const onOutputLoading = useCallback((v) => setTabBusy('output', v), [setTabBusy]);
-  const onReportsLoading = useCallback((v) => setTabBusy('reports', v), [setTabBusy]);
-  const onMemoryLoading = useCallback((v) => setTabBusy('memory', v), [setTabBusy]);
-  const onRequirementsLoading = useCallback((v) => setTabBusy('requirements', v), [setTabBusy]);
-  const onAppLoading = useCallback((v) => setTabBusy('app', v), [setTabBusy]);
-  const onRecordingsLoading = useCallback((v) => setTabBusy('recordings', v), [setTabBusy]);
+  const onOutputLoading = useCallback((v: boolean) => setTabBusy('output', v), [setTabBusy]);
+  const onReportsLoading = useCallback((v: boolean) => setTabBusy('reports', v), [setTabBusy]);
+  const onMemoryLoading = useCallback((v: boolean) => setTabBusy('memory', v), [setTabBusy]);
+  const onRequirementsLoading = useCallback((v: boolean) => setTabBusy('requirements', v), [setTabBusy]);
+  const onAppLoading = useCallback((v: boolean) => setTabBusy('app', v), [setTabBusy]);
+  const onRecordingsLoading = useCallback((v: boolean) => setTabBusy('recordings', v), [setTabBusy]);
   const [chatMsg, setChatMsg] = useState('');
   const [chatSending, setChatSending] = useState(false);
-  const outputEndRef = useRef(null);
+  const outputEndRef = useRef<HTMLDivElement>(null);
 
   // App health polling (for tab indicator)
-  const [appHealthy, setAppHealthy] = useState(null);
+  const [appHealthy, setAppHealthy] = useState<boolean | null>(null);
   useEffect(() => {
     const poll = () => fetch('/api/app-health').then(r => r.json()).then(d => setAppHealthy(d.healthy)).catch(() => {});
     poll();
@@ -213,12 +311,12 @@ export default function SessionPanel() {
   }, []);
 
   // Track which task to show session output for
-  const [selectedTaskId, setSelectedTaskId] = useState(() => {
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     return localStorage.getItem('oc-selected-task') || null;
   });
 
-  const selectTask = useCallback((id) => {
+  const selectTask = useCallback((id: string | null) => {
     setSelectedTaskId(id);
     if (id) localStorage.setItem('oc-selected-task', id);
     else localStorage.removeItem('oc-selected-task');
@@ -238,7 +336,7 @@ export default function SessionPanel() {
 
   useEffect(() => {
     if (selectedTaskId) return;
-    const withResults = TASKS.filter(t => normalizeStatus(results[t.id] || {}) !== 'idle');
+    const withResults = TASKS.filter((t: TaskDef) => normalizeStatus(results[t.id] || {}) !== 'idle');
     if (withResults.length > 0) selectTask(withResults[0].id);
   }, [TASKS, results, selectedTaskId, selectTask]);
 
@@ -250,10 +348,10 @@ export default function SessionPanel() {
   const orchestratorActive = orchStarted && !orchPaused;
 
   const managedSessionsByTask = useMemo(() => {
-    const byTask: Record<string, any> = {};
-    for (const session of smSessions as any[]) {
+    const byTask: Record<string, ManagedSessionData> = {};
+    for (const session of smSessions) {
       if (!session.taskId || session.isController) continue;
-      if (!['healthy', 'stale', 'duplicate'].includes(session.status)) continue;
+      if (!['healthy', 'stale', 'duplicate'].includes(session.status || '')) continue;
 
       const current = byTask[session.taskId];
       const currentUpdatedAt = current ? Math.max(current.lastActivityTs || 0, current.updatedAt || 0) : -1;
@@ -302,14 +400,14 @@ export default function SessionPanel() {
         if (!data.ok) throw new Error(data.error);
       }
       addLog('CHAT', `Sent to ${activeTaskId || 'controller'}: ${msg.slice(0, 80)}`, 'success');
-    } catch (e) {
-      addLog('SYSTEM', `Send failed: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      addLog('SYSTEM', `Send failed: ${(e as Error).message}`, 'error');
     }
     setChatSending(false);
   };
 
   const taskOptions = useMemo(() => {
-    return TASKS.map(t => {
+    return TASKS.map((t: TaskDef) => {
       const s = normalizeStatus(results[t.id] || {});
       return { id: t.id, label: `S${t.num}: ${t.title}`, status: s, icon: t.icon };
     });
@@ -320,7 +418,7 @@ export default function SessionPanel() {
       {/* Progress bar */}
       <div className="px-4 py-2 border-b border-border bg-card/30 shrink-0">
         <div className="flex gap-1 h-1.5">
-          {TASKS.map(t => {
+          {TASKS.map((t: TaskDef) => {
             const s = normalizeStatus(results[t.id] || {});
             const color = s === 'passed' ? 'bg-green-400' : s === 'failed' ? 'bg-red-400' : s === 'running' ? 'bg-amber-400 animate-pulse' : 'bg-border';
             return (
@@ -431,10 +529,10 @@ export default function SessionPanel() {
             <div className="px-3 py-2 border-b border-border bg-card/20 flex items-center gap-2 shrink-0">
               <span className="font-mono text-[10px] text-zinc-400">{logEntries.length} entries</span>
               <div className="flex-1" />
-              <CopyButton getText={() => logEntries.map(e => `${e.time}  ${e.agent}  ${e.msg}`).join('\n')} />
+              <CopyButton getText={() => logEntries.map((e: LogEntry) => `${e.time}  ${e.agent}  ${e.msg}`).join('\n')} />
             </div>
             <div className="flex-1 overflow-y-auto p-3 font-mono text-[11px] leading-[1.8]">
-              {logEntries.map((entry, i) => (
+              {logEntries.map((entry: LogEntry, i: number) => (
                 <div
                   key={i}
                   className={`flex gap-3 px-2 py-0.5 rounded hover:bg-white/[0.02] transition-colors ${
@@ -466,11 +564,34 @@ export default function SessionPanel() {
 
 // ── Session Output Tab ──────────────────────────────────────────
 
+interface SessionOutputTabProps {
+  activeTaskId: string | null;
+  results: Record<string, ResultData>;
+  taskOptions: TaskOption[];
+  sessionId: string | null;
+  orchestratorActive: boolean;
+  managedSession: ManagedSessionData | null;
+  gatewayStatus: string;
+  loading: boolean;
+  entries: SessionHistoryEntryData[];
+  truncated: boolean;
+  loadingEarlier: boolean;
+  loadEarlier: () => void;
+  clearHistory: () => void;
+  selectTask: (id: string | null) => void;
+  onLoadingChange: (loading: boolean) => void;
+  chatMsg: string;
+  setChatMsg: (msg: string) => void;
+  chatSending: boolean;
+  sendChat: () => void;
+  outputEndRef: React.RefObject<HTMLDivElement | null>;
+}
+
 function SessionOutputTab({
   activeTaskId, results, taskOptions, sessionId, orchestratorActive, managedSession, gatewayStatus, loading,
   entries, truncated, loadingEarlier, loadEarlier, clearHistory, selectTask,
   onLoadingChange, chatMsg, setChatMsg, chatSending, sendChat, outputEndRef,
-}: any) {
+}: SessionOutputTabProps) {
   const { project } = useProjectConfig();
 
   const [splitView, setSplitView] = useState(() => {
@@ -502,7 +623,7 @@ function SessionOutputTab({
   } = useScreencast({ enabled: liveBrowserEnabled, quality: 55, fps: 5, taskId: liveManagedTaskId });
 
   // Recording status (auto-managed — recording starts/stops with the task)
-  const [recordingStatus, setRecordingStatus] = useState(null);
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatusData | null>(null);
 
   useEffect(() => {
     if (!liveManagedTaskId) { setRecordingStatus(null); return; }
@@ -554,8 +675,8 @@ function SessionOutputTab({
       <div className="px-4 py-3 border-t border-border flex gap-2 shrink-0 bg-card/30">
         <input
           value={chatMsg}
-          onChange={(e) => setChatMsg(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !chatSending && sendChat()}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setChatMsg(e.target.value)}
+          onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && !e.shiftKey && !chatSending && sendChat()}
           placeholder={`Message ${activeTaskId || 'controller'}...${gatewayStatus === 'connected' ? '' : ' (via CLI)'}`}
           disabled={false}
           className="flex-1 bg-[#0a0a12] border border-border rounded-lg px-3 py-2.5 text-xs text-zinc-200 font-mono placeholder:text-zinc-600 disabled:opacity-40"
@@ -581,7 +702,7 @@ function SessionOutputTab({
       <div className="px-4 py-2 border-b border-border bg-card/20 flex items-center gap-3 shrink-0">
         <select
           value={activeTaskId || ''}
-          onChange={(e) => { selectTask(e.target.value || null); clearHistory(); }}
+          onChange={(e: React.ChangeEvent<HTMLSelectElement>) => { selectTask(e.target.value || null); clearHistory(); }}
           className="bg-elevated border border-border rounded px-2 py-1 text-[11px] text-zinc-300 font-mono flex-1 max-w-[280px]"
         >
           <option value="">Select a task...</option>
@@ -712,12 +833,12 @@ function SessionOutputTab({
 function StoriesTab() {
   const { tasks: TASKS } = useProjectConfig();
   const { results } = useDashboard();
-  const [expanded, setExpanded] = useState(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   return (
     <div className="flex-1 overflow-y-auto">
-      {TASKS.map(t => {
-        const d: Record<string, any> = results[t.id] || {};
+      {TASKS.map((t: TaskDef) => {
+        const d: ResultData = results[t.id] || {};
         const s = normalizeStatus(d);
         const isOpen = expanded === t.id;
 
@@ -746,8 +867,8 @@ function StoriesTab() {
                   <div><span className="text-zinc-500">Description:</span> <span className="text-zinc-300">{t.desc}</span></div>
                   <div><span className="text-zinc-500">Default model:</span> <span className="text-zinc-300 font-mono">{t.defaultModel}</span></div>
                   <div><span className="text-zinc-500">Task ID:</span> <span className="text-zinc-300 font-mono">{t.id}</span></div>
-                  {t.deps?.length > 0 && (
-                    <div><span className="text-zinc-500">Dependencies:</span> <span className="text-zinc-300 font-mono">{t.deps.join(', ')}</span></div>
+                  {(t.deps?.length ?? 0) > 0 && (
+                    <div><span className="text-zinc-500">Dependencies:</span> <span className="text-zinc-300 font-mono">{t.deps?.join(', ')}</span></div>
                   )}
                   {d.lastLog && (
                     <div><span className="text-zinc-500">Last log:</span> <span className="text-zinc-400">{d.lastLog}</span></div>
@@ -771,8 +892,14 @@ function StoriesTab() {
 
 // ── File Viewer Tab (Memory / Requirements / Reports) ───────────
 
-function FileViewerTab({ folder, title, onLoadingChange }: { folder: string; title: string; onLoadingChange?: (loading: boolean) => void }) {
-  const [files, setFiles] = useState<any[]>([]);
+interface FileViewerTabProps {
+  folder: string;
+  title: string;
+  onLoadingChange?: (loading: boolean) => void;
+}
+
+function FileViewerTab({ folder, title, onLoadingChange }: FileViewerTabProps) {
+  const [files, setFiles] = useState<FileInfo[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -888,9 +1015,9 @@ function FileViewerTab({ folder, title, onLoadingChange }: { folder: string; tit
  * Visible when the last entry is a tool_call (awaiting result), an assistant
  * thinking part, or a tool_result (agent is formulating next response).
  */
-function ThinkingIndicator({ entries, taskId }: { entries: any[]; taskId: string }) {
+function ThinkingIndicator({ entries, taskId }: { entries: SessionHistoryEntryData[]; taskId: string | null }) {
   const { results } = useDashboard();
-  const taskStatus = results[taskId]?.status;
+  const taskStatus = taskId ? results[taskId]?.status : undefined;
 
   if (!taskId || entries.length === 0 || taskStatus !== 'running') return null;
 
@@ -920,9 +1047,9 @@ function ThinkingIndicator({ entries, taskId }: { entries: any[]; taskId: string
   );
 }
 
-function ThinkingBlock({ part }: { part: any }) {
+function ThinkingBlock({ part }: { part: EntryPart }) {
   const [expanded, setExpanded] = useState(false);
-  const hasMore = part.fullText && part.fullText.length > part.text.length;
+  const hasMore = part.fullText && part.fullText.length > (part.text?.length || 0);
 
   return (
     <div className="border-l-2 border-purple-400/30 pl-3">
@@ -944,7 +1071,7 @@ function ThinkingBlock({ part }: { part: any }) {
   );
 }
 
-function SessionEntry({ entry }: { entry: any }) {
+function SessionEntry({ entry }: { entry: SessionHistoryEntryData }) {
   const [collapsed, setCollapsed] = useState(true);
 
   switch (entry.kind) {
@@ -953,7 +1080,7 @@ function SessionEntry({ entry }: { entry: any }) {
         <div className="flex gap-3 items-start">
           <div className="font-mono text-[11px] text-zinc-500 shrink-0 pt-0.5 w-14">user</div>
           <div className="flex-1 min-w-0 bg-white/[0.02] border border-border rounded-xl px-4 py-3">
-            <ReactMarkdown components={mdComponents}>{entry.text}</ReactMarkdown>
+            <ReactMarkdown components={mdComponents}>{entry.text || ''}</ReactMarkdown>
             {entry.timestamp && (
               <div className="font-mono text-[8px] text-zinc-600 mt-2">{new Date(entry.timestamp).toLocaleTimeString('en-GB')}</div>
             )}
@@ -966,12 +1093,12 @@ function SessionEntry({ entry }: { entry: any }) {
         <div className="flex gap-3 items-start">
           <div className="font-mono text-[11px] text-purple-400 shrink-0 pt-0.5 w-14">assistant</div>
           <div className="flex-1 min-w-0 space-y-2">
-            {entry.parts.map((part, i) => {
+            {(entry.parts || []).map((part, i) => {
               if (part.type === 'text') {
                 return (
                   <div key={i} className="bg-elevated border border-border rounded-xl px-4 py-3">
-                    <ReactMarkdown components={mdComponents}>{part.text}</ReactMarkdown>
-                    {i === entry.parts.length - 1 && entry.timestamp && (
+                    <ReactMarkdown components={mdComponents}>{part.text || ''}</ReactMarkdown>
+                    {i === (entry.parts?.length || 0) - 1 && entry.timestamp && (
                       <div className="font-mono text-[8px] text-zinc-600 mt-2">{new Date(entry.timestamp).toLocaleTimeString('en-GB')}</div>
                     )}
                   </div>
@@ -1068,7 +1195,7 @@ function SessionEntry({ entry }: { entry: any }) {
 /** Collapsible app log snippet for a finding */
 function FindingLogSnippet({ taskId, findingId }: { taskId: string; findingId: string }) {
   const [open, setOpen] = useState(false);
-  const [log, setLog] = useState(null); // null=not loaded, ''=no data
+  const [log, setLog] = useState<string | null>(null); // null=not loaded, ''=no data
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(() => {
@@ -1107,15 +1234,21 @@ function FindingLogSnippet({ taskId, findingId }: { taskId: string; findingId: s
   );
 }
 
-function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Record<string, any>; addLog: (agent: string, msg: string, logType?: string) => void }) {
-  const [copiedId, setCopiedId] = useState(null);
-  const [expandedId, setExpandedId] = useState(null);
-  const [resolvedFindings, setResolvedFindings] = useState(() => {
+interface TaskResultsListProps {
+  tasks: TaskDef[];
+  results: Record<string, ResultData>;
+  addLog: (agent: string, msg: string, type?: string) => void;
+}
+
+function TaskResultsList({ tasks, results, addLog }: TaskResultsListProps) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [resolvedFindings, setResolvedFindings] = useState<Record<string, number>>(() => {
     try { return JSON.parse(localStorage.getItem('openclaw-resolved-findings') || '{}'); } catch { return {}; }
   });
-  const [playingTaskId, setPlayingTaskId] = useState(null);
-  const [playingFindingId, setPlayingFindingId] = useState(null);
-  const [recordingAvail, setRecordingAvail] = useState({});
+  const [playingTaskId, setPlayingTaskId] = useState<string | null>(null);
+  const [playingFindingId, setPlayingFindingId] = useState<string | null>(null);
+  const [recordingAvail, setRecordingAvail] = useState<Record<string, boolean>>({});
 
   // Check recording existence when a task is expanded
   useEffect(() => {
@@ -1128,7 +1261,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
       .catch(() => {});
   }, [expandedId, recordingAvail]);
 
-  const toggleResolved = (findingKey) => {
+  const toggleResolved = (findingKey: string) => {
     setResolvedFindings(prev => {
       const next = { ...prev };
       if (next[findingKey]) delete next[findingKey];
@@ -1138,7 +1271,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
     });
   };
 
-  const copyOutput = async (taskId) => {
+  const copyOutput = async (taskId: string) => {
     try {
       const r = await fetch(`/api/report-md?agentId=${encodeURIComponent(taskId)}`);
       const data = await r.json();
@@ -1147,14 +1280,14 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
       setCopiedId(taskId);
       setTimeout(() => setCopiedId(null), 2000);
       addLog('SYSTEM', `Copied output for ${taskId}`, 'success');
-    } catch (e) {
-      addLog('SYSTEM', `Copy failed: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      addLog('SYSTEM', `Copy failed: ${(e as Error).message}`, 'error');
     }
   };
 
-  const copyResultPrompt = async (taskId, task) => {
+  const copyResultPrompt = async (taskId: string, task: TaskDef) => {
     try {
-      const d = results[taskId] || {};
+      const d: ResultData = results[taskId] || {};
       const reportRes = await fetch(`/api/report-md?agentId=${encodeURIComponent(taskId)}`);
       const reportData = await reportRes.json();
       const reportContent = reportData?.ok ? reportData.content : '';
@@ -1170,7 +1303,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
         const viewport = inferFindingViewport(f);
         const mod = f.module ? ` [${f.module}]` : '';
         const viewportText = viewport !== 'shared' ? ` [${viewportLabel(viewport)}]` : '';
-        const page = f.page ? ` — ${f.page}` : '';
+        const page = f.page ? ` \u2014 ${f.page}` : '';
         return `${i + 1}. [${sev.toUpperCase()}]${mod}${viewportText} ${f.title || f.description || f.id}${page}${f.steps ? '\n   Steps: ' + f.steps : ''}${f.expected ? '\n   Expected: ' + f.expected : ''}${f.actual ? '\n   Actual: ' + f.actual : ''}`;
       }).join('\n');
 
@@ -1194,17 +1327,17 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
       setCopiedId(`prompt-${taskId}`);
       setTimeout(() => setCopiedId(null), 2000);
       addLog('SYSTEM', `Copied result prompt for ${taskId}`, 'success');
-    } catch (e) {
-      addLog('SYSTEM', `Copy failed: ${e.message}`, 'error');
+    } catch (e: unknown) {
+      addLog('SYSTEM', `Copy failed: ${(e as Error).message}`, 'error');
     }
   };
 
-  const countVal = (v) => typeof v === 'number' ? v : Array.isArray(v) ? v.length : 0;
+  const countVal = (v: unknown) => typeof v === 'number' ? v : Array.isArray(v) ? v.length : 0;
 
   return (
     <div className="flex-1 overflow-y-auto">
       {tasks.map(t => {
-        const d = results[t.id] || {};
+        const d: ResultData = results[t.id] || {};
         const s = normalizeStatus(d);
         const allFindings = d.findings || [];
         const findings = allFindings.filter(f => {
@@ -1252,7 +1385,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
                 </div>
               ) : null}
 
-              {s === 'running' && d.progress > 0 && (
+              {s === 'running' && (d.progress || 0) > 0 && (
                 <div className="mt-1.5 ml-9">
                   <div className="h-1 bg-border rounded-full overflow-hidden w-40">
                     <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${d.progress}%` }} />
@@ -1268,13 +1401,13 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
                   {(s === 'passed' || s === 'failed') && (
                     <>
                       <button
-                        onClick={(e) => { e.stopPropagation(); copyOutput(t.id); }}
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); copyOutput(t.id); }}
                         className="font-mono text-[10px] text-zinc-400 hover:text-accent transition-colors bg-white/[0.03] border border-border rounded px-2.5 py-1"
                       >
                         {copiedId === t.id ? '\u2713 Copied' : '\u29c9 Copy Report'}
                       </button>
                       <button
-                        onClick={(e) => { e.stopPropagation(); copyResultPrompt(t.id, t); }}
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); copyResultPrompt(t.id, t); }}
                         className="font-mono text-[10px] text-zinc-400 hover:text-purple-400 transition-colors bg-purple-400/5 border border-purple-400/15 rounded px-2.5 py-1"
                       >
                         {copiedId === `prompt-${t.id}` ? '\u2713 Copied' : '\u2728 Copy Fix Prompt'}
@@ -1283,7 +1416,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
                   )}
                   {recordingAvail[t.id] && (
                     <button
-                      onClick={(e) => { e.stopPropagation(); setPlayingTaskId(t.id); setPlayingFindingId(null); }}
+                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); setPlayingTaskId(t.id); setPlayingFindingId(null); }}
                       className="font-mono text-[10px] text-zinc-400 hover:text-blue-400 transition-colors bg-blue-400/5 border border-blue-400/15 rounded px-2.5 py-1"
                     >
                       {'\u25b6'} Watch Recording
@@ -1318,7 +1451,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
                     {findings.length > 0 && (
                       <div className="space-y-1.5">
                         <div className="font-mono text-[10px] text-zinc-400 font-medium">Findings:</div>
-                        {['desktop', 'mobile', 'shared'].map((bucket) => {
+                        {(['desktop', 'mobile', 'shared'] as const).map((bucket) => {
                           const bucketFindings = groupedFindings[bucket];
                           if (!bucketFindings || bucketFindings.length === 0) return null;
 
@@ -1366,7 +1499,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
                                       </div>
                                       {recordingAvail[t.id] && f.id && (
                                         <button
-                                          onClick={(e) => { e.stopPropagation(); setPlayingTaskId(t.id); setPlayingFindingId(f.id); }}
+                                          onClick={(e: React.MouseEvent) => { e.stopPropagation(); setPlayingTaskId(t.id); setPlayingFindingId(f.id || null); }}
                                           className="shrink-0 font-mono text-[9px] text-blue-400/60 hover:text-blue-400 transition-colors px-1 py-0.5"
                                           title="Watch recording at this finding"
                                         >
@@ -1374,7 +1507,7 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
                                         </button>
                                       )}
                                       <button
-                                        onClick={(e) => { e.stopPropagation(); toggleResolved(findingKey); }}
+                                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleResolved(findingKey); }}
                                         className={`shrink-0 font-mono text-[9px] px-1.5 py-0.5 rounded transition-colors ${
                                           isResolved
                                             ? 'text-green-400 bg-green-400/10 hover:bg-green-400/20'
@@ -1421,9 +1554,9 @@ function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Re
 // ── Recordings Tab ──────────────────────────────────────────────
 
 function RecordingsTab({ onLoadingChange }: { onLoadingChange?: (loading: boolean) => void }) {
-  const [recordings, setRecordings] = useState({ active: [], saved: [] });
+  const [recordings, setRecordings] = useState<{ active: RecordingInfo[]; saved: RecordingInfo[] }>({ active: [], saved: [] });
   const [loading, setLoading] = useState(true);
-  const [selectedTaskId, setSelectedTaskId] = useState(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -1478,7 +1611,7 @@ function RecordingsTab({ onLoadingChange }: { onLoadingChange?: (loading: boolea
     );
   }
 
-  const formatDuration = (ms) => {
+  const formatDuration = (ms: number | undefined) => {
     if (!ms) return '--';
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
@@ -1505,7 +1638,7 @@ function RecordingsTab({ onLoadingChange }: { onLoadingChange?: (loading: boolea
                 {r.frameCount} frames
               </div>
             </div>
-            {r.findingCount > 0 && (
+            {(r.findingCount || 0) > 0 && (
               <span className="font-mono text-[9px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">
                 {r.findingCount} finding{r.findingCount !== 1 ? 's' : ''}
               </span>
@@ -1522,13 +1655,13 @@ function RecordingsTab({ onLoadingChange }: { onLoadingChange?: (loading: boolea
   );
 }
 
-function ResultJsonToggle({ data }: { data: any }) {
+function ResultJsonToggle({ data }: { data: ResultData }) {
   const [show, setShow] = useState(false);
   if (!data || Object.keys(data).length === 0) return null;
   return (
     <div>
       <button
-        onClick={(e) => { e.stopPropagation(); setShow(!show); }}
+        onClick={(e: React.MouseEvent) => { e.stopPropagation(); setShow(!show); }}
         className="font-mono text-[9px] text-zinc-600 hover:text-zinc-400 transition-colors"
       >
         {show ? '\u25bc Raw JSON' : '\u25b6 Raw JSON'}
