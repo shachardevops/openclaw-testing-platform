@@ -50,6 +50,57 @@
     "maxPatterns": 500,
     "consolidationThreshold": 3
   },
+  "driftDetection": {
+    "enabled": true,
+    "checkpointIntervalMs": 120000,
+    "maxSilenceMs": 300000,
+    "scopeKeywords": true,
+    "divergenceThreshold": 0.6
+  },
+  "auditTrail": {
+    "enabled": true,
+    "maxMemoryEvents": 2000,
+    "flushIntervalMs": 60000,
+    "chainValidation": true
+  },
+  "taskClaims": {
+    "enabled": true,
+    "defaultTtlMs": 1800000,
+    "allowForceClaim": true
+  },
+  "consensus": {
+    "enabled": true,
+    "quorumSize": 2,
+    "criticalActions": ["kill", "recover", "respawn"]
+  },
+  "selfHealing": {
+    "enabled": true,
+    "maxRetries": 3,
+    "baseDelayMs": 2000,
+    "maxDelayMs": 60000,
+    "jitterFactor": 0.3,
+    "circuitBreaker": {
+      "failureThreshold": 5,
+      "resetTimeoutMs": 300000,
+      "halfOpenMaxAttempts": 2
+    }
+  },
+  "memoryTiers": {
+    "enabled": true,
+    "working": { "maxEntries": 100, "ttlMs": 600000 },
+    "episodic": { "maxEntries": 500, "decayHalfLifeMs": 86400000 },
+    "semantic": { "maxEntries": 200, "minImportance": 0.7 },
+    "consolidationIntervalMs": 300000
+  },
+  "tokenTracking": {
+    "enabled": true,
+    "trackPerTask": true,
+    "trackPerModel": true,
+    "costAlerts": {
+      "warnThresholdTokens": 100000,
+      "criticalThresholdTokens": 500000
+    }
+  },
   "modelFallback": {
     "enabled": true,
     "errorPatterns": ["overloaded", "rate limit", "rate_limit", "429", "529", "capacity", "api is busy", "too many requests", "server_error", "service_unavailable", "Request timed out"],

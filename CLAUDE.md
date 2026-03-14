@@ -31,10 +31,10 @@ UI dispatch (runTask/cancelTask)
 
 ### Key Directories
 
-- **app/api/** — 21 API routes. All use `runtime = 'nodejs'` (required for child_process/fs). Return `{ ok, data/error }` JSON.
+- **app/api/** — 30+ API routes. All use `runtime = 'nodejs'` (required for child_process/fs). Return `{ ok, data/error }` JSON.
 - **context/** — `dashboard-context.jsx` is the main state orchestrator (results, pending runs, skills, models, pipelines, streaming). `project-config-context.jsx` loads project config from API.
 - **hooks/** — `use-pipeline-runner.js` (sequential pipeline execution), `use-bridge-stream.js` (live output via byte-offset polling), `use-polling.js` (generic interval), `use-orchestrator.js` (orchestrator engine status polling + actions).
-- **lib/** — `openclaw.js` (CLI bridge: spawnAgent/execAgent/listSessions), `config.js` (paths/workspace), `project-loader.js` (config resolution), `report-parser.js` (markdown → pass/fail counts), `orchestrator-engine.js` (deterministic decision engine for session recovery).
+- **lib/** — `openclaw.js` (CLI bridge: spawnAgent/execAgent/listSessions), `config.js` (paths/workspace), `project-loader.js` (config resolution), `report-parser.js` (markdown → pass/fail counts), `orchestrator-engine.js` (deterministic decision engine for session recovery), `drift-detector.js`, `audit-trail.js`, `task-claims.js`, `consensus-validator.js`, `self-healing.js`, `security-validator.js`, `memory-tiers.js`, `token-tracker.js`, `learning-loop.js`, `quality-gates.js`.
 - **config/** — Per-project configs in `config/<projectId>/` (tasks.json, models.json, skills.json, pipelines.json, pipeline-config.json). Includes `memory/` (agent learnings, known bugs, run logs) and `requirements/` (output format, bug templates, checklists). Falls back to legacy `data/project.config.js`.
 - **stories/** — QA test story templates (markdown with test case tables).
 
@@ -83,6 +83,48 @@ The dashboard uses React Context with a reducer pattern (`dashboard-reducer.js`)
 - All UI components are client components (`'use client'`).
 - Components use `useDashboard()` and `useProjectConfig()` hooks for state access.
 - Task configuration: model is required, skills are optional. Both stored in context and resolved at run time.
+
+### Resilience & Intelligence Patterns (ruflo-inspired)
+
+The platform implements enterprise-grade patterns from ruflo's architecture:
+
+#### Anti-Drift Detection (`lib/drift-detector.js`, `/api/drift-detector`)
+Prevents multi-agent goal drift via checkpoint verification, output loop detection, silence alerts, and scope violation checks. The orchestrator runs drift evaluation on every tick for all active tasks. Configurable via `project.json` → `driftDetection`.
+
+#### Event Sourcing Audit Trail (`lib/audit-trail.js`, `/api/audit-trail`)
+Hash-chained (SHA-256) immutable event log. Every significant action (task, pipeline, orchestrator, gate, drift, claim, system) is recorded with tamper detection. Supports event replay per task and chain integrity verification. Persists to `memory/audit-trail.json`. Config: `auditTrail`.
+
+#### Task Claims System (`lib/task-claims.js`, `/api/task-claims`)
+Prevents duplicate work via exclusive task ownership with TTL-based auto-expiry. Supports claim/release/handoff protocols. Used before task dispatch and orchestrator recovery. Config: `taskClaims`.
+
+#### Consensus Validator (`lib/consensus-validator.js`, `/api/consensus`)
+Byzantine-inspired multi-signal validation for critical actions (kill, recover, respawn). Registered voters (orchestrator, drift-detector, self-healing) must reach quorum before action proceeds. Config: `consensus`.
+
+#### Self-Healing Workflows (`lib/self-healing.js`, `/api/self-healing`)
+Intelligent retry with exponential backoff + jitter. Circuit breaker pattern (closed → open → half-open) prevents cascading failures. Fallback chains for alternative approaches. Config: `selfHealing`.
+
+#### Security Validation (`lib/security-validator.js`, `/api/security`)
+Input validation at system boundaries: path traversal prevention, command injection blocking, field sanitization, per-action rate limiting. All API routes should call `validateInput()` / `validateApiRequest()`.
+
+#### Hierarchical Memory Tiers (`lib/memory-tiers.js`, `/api/memory-tiers`)
+Three-tier knowledge architecture:
+- **Working** — fast volatile LRU cache (10min TTL), current session data
+- **Episodic** — time-decayed importance scoring, recent patterns
+- **Semantic** — consolidated persistent knowledge, auto-promoted from episodic
+
+Periodic consolidation moves high-importance episodic entries to semantic memory. Config: `memoryTiers`.
+
+#### Token Optimization Tracker (`lib/token-tracker.js`, `/api/token-tracker`)
+Tracks per-task and per-model token usage with cost estimation. Implements ruflo's 3-tier model routing concept (simple → cheap model, complex → capable model). Provides cost alerts and efficiency-based model recommendations. Config: `tokenTracking`.
+
+#### Autonomy Levels (in `lib/orchestrator-engine.js`)
+5-level graduated control (0=manual → 4=adaptive). Lower levels require human confirmation for escalation actions. Exposed via `/api/orchestrator` POST `set-autonomy-level`, `confirm-action`, `deny-action`.
+
+#### Quality Gates (`lib/quality-gates.js`, `/api/quality-gates`)
+Configurable validation before pipeline advancement: minPassRate, maxP1Bugs, maxFailures, requireReport, custom checks. Fail action: `warn` (log + continue) or `block` (pause pipeline). Config: `qualityGates`.
+
+#### Learning Loop (`lib/learning-loop.js`, `/api/learning-loop`)
+RETRIEVE→JUDGE→DISTILL→CONSOLIDATE cycle. Learns from task results (bug patterns, recurring failures) and orchestrator decisions. Tracks model performance with pass rates. Persists to `memory/learnings.json` and `memory/model-stats.json`. Config: `learningLoop`.
 
 ### Known Sharp Edges
 
