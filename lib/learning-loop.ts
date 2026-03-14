@@ -3,6 +3,7 @@ import path from 'path';
 import { getProjectConfig } from './project-loader';
 import { parseFindingsFromReport } from './report-parser';
 import vectorMemory from './vector-memory';
+import { registry } from './service-registry';
 
 const DEFAULT_CONFIG = {
   enabled: false,
@@ -429,4 +430,5 @@ class LearningLoop {
 }
 
 const learningLoop = new LearningLoop();
+registry.register('learningLoop', () => learningLoop);
 export default learningLoop;

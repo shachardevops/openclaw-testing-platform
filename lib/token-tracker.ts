@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getProjectConfig } from './project-loader';
+import { registry } from './service-registry';
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -222,4 +223,5 @@ class TokenTracker {
 }
 
 const tokenTracker = new TokenTracker();
+registry.register('tokenTracker', () => tokenTracker);
 export default tokenTracker;

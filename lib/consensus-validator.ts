@@ -1,4 +1,5 @@
 import { getProjectConfig } from './project-loader';
+import { registry } from './service-registry';
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -107,4 +108,7 @@ class ConsensusValidator {
 }
 
 const consensusValidator = new ConsensusValidator();
+
+registry.register('consensusValidator', () => consensusValidator);
+
 export default consensusValidator;

@@ -1,4 +1,5 @@
 import { getProjectConfig } from './project-loader';
+import { registry } from './service-registry';
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -210,4 +211,7 @@ class TaskClaimsManager {
 }
 
 const taskClaims = new TaskClaimsManager();
+
+registry.register('taskClaims', () => taskClaims);
+
 export default taskClaims;

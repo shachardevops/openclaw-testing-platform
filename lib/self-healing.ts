@@ -1,4 +1,5 @@
 import { getProjectConfig } from './project-loader';
+import { registry } from './service-registry';
 
 interface CircuitBreakerConfig {
   failureThreshold: number;
@@ -288,5 +289,8 @@ class SelfHealingEngine {
 }
 
 const selfHealing = new SelfHealingEngine();
+
+registry.register('selfHealing', () => selfHealing);
+
 export default selfHealing;
 export { CircuitBreaker, CB_STATES };

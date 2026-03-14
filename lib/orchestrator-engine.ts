@@ -14,6 +14,7 @@ import selfHealing from './self-healing';
 import taskClaims from './task-claims';
 import tokenTracker from './token-tracker';
 import memoryManager from './memory-tiers';
+import { registry } from './service-registry';
 
 const AUTONOMY_LEVELS: Record<number, { name: string; autoNudge: boolean; autoSwap: boolean; autoKill: boolean; autoRecover: boolean; aiConsult: boolean }> = {
   0: { name: 'manual', autoNudge: false, autoSwap: false, autoKill: false, autoRecover: false, aiConsult: false },
@@ -688,4 +689,8 @@ class OrchestratorEngine {
 }
 
 const orchestratorEngine = new OrchestratorEngine();
+registry.register('orchestratorEngine', () => orchestratorEngine);
 export default orchestratorEngine;
+
+// Exported for unit testing
+export { ConditionTracker, DecisionMemory, RateLimiter, OrchestratorEngine, AUTONOMY_LEVELS };

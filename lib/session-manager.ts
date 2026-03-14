@@ -5,6 +5,7 @@ import { getControllerSessionId, listSessions, spawnAgent, invalidateSessionsCac
 import { bridgeLogPath, resultsDir } from './config';
 import { getProjectConfig } from './project-loader';
 import appHealth from './app-health';
+import { registry } from './service-registry';
 
 const SESSIONS_DIR = path.join(os.homedir(), '.openclaw/agents/main/sessions');
 const SESSIONS_INDEX = path.join(SESSIONS_DIR, 'sessions.json');
@@ -818,5 +819,7 @@ class SessionManager {
 const sessionManager = new SessionManager();
 
 appHealth.start();
+
+registry.register('sessionManager', () => sessionManager);
 
 export default sessionManager;

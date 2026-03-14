@@ -1,5 +1,6 @@
 import http from 'http';
 import { getProjectConfig } from './project-loader';
+import { registry } from './service-registry';
 
 import type { TargetAppConfig } from '@/types/config';
 
@@ -88,4 +89,5 @@ class AppHealthMonitor {
 }
 
 const appHealth = new AppHealthMonitor();
+registry.register('appHealth', () => appHealth);
 export default appHealth;

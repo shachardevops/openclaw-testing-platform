@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { getProjectConfig } from './project-loader';
+import { registry } from './service-registry';
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -405,4 +406,5 @@ class MemoryManager {
 }
 
 const memoryManager = new MemoryManager();
+registry.register('memoryManager', () => memoryManager);
 export default memoryManager;
