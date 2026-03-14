@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useDashboard } from '@/context/dashboard-context';
 import { useProjectConfig } from '@/context/project-config-context';
 import { normalizeStatus } from '@/lib/normalize-status';
@@ -10,14 +10,39 @@ import ModelSelector from './model-selector';
 import SkillBadge from './skill-badge';
 import SkillPicker from './skill-picker';
 
-import type { TaskDefinition } from '@/types/config';
+interface Task {
+  id: string;
+  num: number;
+  title: string;
+  icon?: string;
+  actor?: string;
+  desc?: string;
+}
+
+interface TaskCardProps {
+  task: Task;
+}
+
+interface Finding {
+  type?: string;
+  text?: string;
+  message?: string;
+}
+
+interface Model {
+  id: string;
+  short: string;
+  color?: string;
+}
+
+interface Skill {
+  id: string;
+  name: string;
+  icon: string;
+}
 
 const BAR_COLOR: Record<string, string> = { running: 'bg-amber-400', passed: 'bg-green-400', failed: 'bg-red-400' };
 const FINDING_ICON: Record<string, string> = { bug: '\ud83d\udc1b', fail: '\ud83d\udc1b', warning: '\u26a0\ufe0f', warn: '\u26a0\ufe0f', pass: '\u2705' };
-
-interface TaskCardProps {
-  task: TaskDefinition & Record<string, unknown>;
-}
 
 export default function TaskCard({ task }: TaskCardProps) {
   const {
@@ -31,14 +56,14 @@ export default function TaskCard({ task }: TaskCardProps) {
   const [showFindings, setShowFindings] = useState(false);
   const streamRef = useRef<HTMLDivElement>(null);
 
-  const d = results[task.id] || {};
+  const d: any = results[task.id] || {};
   const isPending = !!pendingRuns[task.id];
   const status = isPending ? 'queueing' : normalizeStatus(d);
   const model = getTaskModel(task.id);
-  const modelInfo = MODELS.find(m => m.id === model) || {} as Record<string, unknown>;
+  const modelInfo = MODELS.find((m: Model) => m.id === model) || {} as Model;
   const skillIds = getTaskSkills(task.id);
-  const skills = skillIds.map(sid => SKILLS.find(s => s.id === sid)).filter(Boolean);
-  const findings = d.findings || [];
+  const skills = skillIds.map((sid: string) => (SKILLS as any[]).find((s) => s.id === sid)).filter(Boolean) as Skill[];
+  const findings: Finding[] = d.findings || [];
   const hasStats = d.passed || d.failed || d.warnings;
   const liveText = streamingText?.[task.id];
 
@@ -54,7 +79,9 @@ export default function TaskCard({ task }: TaskCardProps) {
       const r = await fetch(`/api/report-md?agentId=${encodeURIComponent(task.id)}`);
       const data = await r.json();
       await navigator.clipboard.writeText(data?.ok ? data.content : `No report for ${task.id}`);
-    } catch (e: unknown) { /* ignore */ }
+    } catch (e: unknown) {
+      // ignore
+    }
   };
 
   return (
@@ -66,22 +93,22 @@ export default function TaskCard({ task }: TaskCardProps) {
         {/* Header row */}
         <div className="flex items-start justify-between mb-2">
           <div className="flex items-center gap-2">
-            <span className="text-xl">{task.icon as string}</span>
+            <span className="text-xl">{task.icon}</span>
             <div>
               <div className="text-sm font-semibold">S{task.num}: {task.title}</div>
               <div className="text-[10px] text-zinc-500">
-                {task.actor as string} &middot; <span style={{ color: (modelInfo as Record<string, unknown>).color as string || '#888' }}>{(modelInfo as Record<string, unknown>).short as string || '?'}</span>
+                {task.actor} &middot; <span style={{ color: modelInfo.color || '#888' }}>{modelInfo.short || '?'}</span>
               </div>
             </div>
           </div>
           <StatusBadge status={status} />
         </div>
 
-        <div className="text-[11px] text-zinc-400 mb-3">{task.desc as string}</div>
+        <div className="text-[11px] text-zinc-400 mb-3">{task.desc}</div>
 
         {/* Progress */}
         {(status === 'running' || status === 'passed' || status === 'failed') && (
-          <ProgressBar progress={d.progress || (status !== 'running' ? 100 : 0)} label={d.progressLabel as string} status={status} />
+          <ProgressBar progress={d.progress || (status !== 'running' ? 100 : 0)} label={d.progressLabel} status={status} />
         )}
 
         {/* Inline streaming output */}
@@ -106,18 +133,18 @@ export default function TaskCard({ task }: TaskCardProps) {
         {/* Skills */}
         <div className="flex flex-wrap items-center gap-1.5 mb-3">
           {skills.map(s => (
-            s && <SkillBadge key={s.id} skill={s as { icon?: string; name: string }} onRemove={() => detachSkill(task.id, s!.id)} />
+            <SkillBadge key={s.id} skill={s} onRemove={() => detachSkill(task.id, s.id)} />
           ))}
           <SkillPicker
             attachedIds={skillIds}
-            onToggle={(sid) => skillIds.includes(sid) ? detachSkill(task.id, sid) : attachSkill(task.id, sid)}
+            onToggle={(sid: string) => skillIds.includes(sid) ? detachSkill(task.id, sid) : attachSkill(task.id, sid)}
           />
         </div>
 
         {/* Model selector */}
-        <div className="mb-3" onClick={(e) => e.stopPropagation()}>
+        <div className="mb-3" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
           <label className="block text-[9px] text-zinc-500 mb-0.5 font-mono uppercase tracking-wider">Model</label>
-          <ModelSelector value={model} onChange={(v) => setTaskModel(task.id, v)} />
+          <ModelSelector value={model} onChange={(v: string) => setTaskModel(task.id, v)} />
         </div>
 
         {/* Action buttons */}
@@ -148,10 +175,10 @@ export default function TaskCard({ task }: TaskCardProps) {
             </button>
             {showFindings && (
               <div className="mt-1.5 space-y-1 max-h-[200px] overflow-y-auto">
-                {findings.map((f: Record<string, unknown>, i: number) => (
+                {findings.map((f, i) => (
                   <div key={i} className="text-[10px] text-zinc-400 flex gap-1.5 items-start">
-                    <span className="shrink-0">{FINDING_ICON[f.type as string] || '\u2139\ufe0f'}</span>
-                    <span>{(f.text as string) || (f.message as string) || JSON.stringify(f)}</span>
+                    <span className="shrink-0">{FINDING_ICON[f.type || ''] || '\u2139\ufe0f'}</span>
+                    <span>{f.text || f.message || JSON.stringify(f)}</span>
                   </div>
                 ))}
               </div>

@@ -12,6 +12,7 @@ export interface MessageTemplates {
 export interface TargetAppConfig {
   name?: string;
   path?: string;
+  command?: string;
   port?: number;
   logFile?: string;
   healthUrl?: string;
@@ -147,6 +148,10 @@ export interface TaskDefinition {
   defaultModel?: string;
   defaultSkills?: string[];
   tags?: string[];
+  icon?: string;
+  actor?: string;
+  desc?: string;
+  deps?: string[];
 }
 
 export interface ModelDefinition {
@@ -154,12 +159,15 @@ export interface ModelDefinition {
   short: string;
   name: string;
   provider?: string;
+  color?: string;
 }
 
 export interface SkillDefinition {
   id: string;
   name: string;
   description?: string;
+  icon?: string;
+  [key: string]: unknown;
 }
 
 export interface PipelineDefinition {

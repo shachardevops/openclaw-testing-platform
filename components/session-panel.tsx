@@ -17,43 +17,45 @@ import SwarmTab from '@/components/swarm-tab';
 import KnowledgeGraphTab from '@/components/knowledge-graph-tab';
 import RecordingPlayer from '@/components/recording-player';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /** Shared markdown components for consistent rendering */
-const mdComponents = {
-  h1: ({ children }) => <h1 className="text-base font-bold text-zinc-100 mt-3 mb-1.5">{children}</h1>,
-  h2: ({ children }) => <h2 className="text-sm font-bold text-zinc-100 mt-2.5 mb-1">{children}</h2>,
-  h3: ({ children }) => <h3 className="text-[13px] font-semibold text-zinc-200 mt-2 mb-1">{children}</h3>,
-  p: ({ children }) => <div className="text-[13px] text-zinc-300 leading-relaxed mb-1.5">{children}</div>,
-  strong: ({ children }) => <strong className="font-semibold text-zinc-100">{children}</strong>,
-  em: ({ children }) => <em className="text-zinc-400">{children}</em>,
-  ul: ({ children }) => <ul className="list-disc pl-5 mb-1.5 space-y-0.5">{children}</ul>,
-  ol: ({ children }) => <ol className="list-decimal pl-5 mb-1.5 space-y-0.5">{children}</ol>,
-  li: ({ children }) => <li className="text-[13px] text-zinc-300 leading-relaxed">{children}</li>,
-  pre: ({ children }) => (
+const mdComponents: Record<string, React.ComponentType<any>> = {
+  h1: ({ children }: any) => <h1 className="text-base font-bold text-zinc-100 mt-3 mb-1.5">{children}</h1>,
+  h2: ({ children }: any) => <h2 className="text-sm font-bold text-zinc-100 mt-2.5 mb-1">{children}</h2>,
+  h3: ({ children }: any) => <h3 className="text-[13px] font-semibold text-zinc-200 mt-2 mb-1">{children}</h3>,
+  p: ({ children }: any) => <div className="text-[13px] text-zinc-300 leading-relaxed mb-1.5">{children}</div>,
+  strong: ({ children }: any) => <strong className="font-semibold text-zinc-100">{children}</strong>,
+  em: ({ children }: any) => <em className="text-zinc-400">{children}</em>,
+  ul: ({ children }: any) => <ul className="list-disc pl-5 mb-1.5 space-y-0.5">{children}</ul>,
+  ol: ({ children }: any) => <ol className="list-decimal pl-5 mb-1.5 space-y-0.5">{children}</ol>,
+  li: ({ children }: any) => <li className="text-[13px] text-zinc-300 leading-relaxed">{children}</li>,
+  pre: ({ children }: any) => (
     <pre className="bg-[#0a0a14] border border-border rounded-lg px-3 py-2 overflow-x-auto my-1.5">{children}</pre>
   ),
-  code: ({ className, children }) => {
+  code: ({ className, children }: any) => {
     if (className?.startsWith('language-')) {
       return <code className="text-[11px] text-zinc-300 font-mono leading-snug">{children}</code>;
     }
     return <code className="bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded text-[12px] font-mono">{children}</code>;
   },
-  blockquote: ({ children }) => (
+  blockquote: ({ children }: any) => (
     <blockquote className="border-l-2 border-zinc-600 pl-3 text-zinc-400 italic my-1.5">{children}</blockquote>
   ),
-  a: ({ children }) => <span className="text-accent underline">{children}</span>,
+  a: ({ children }: any) => <span className="text-accent underline">{children}</span>,
   hr: () => <hr className="border-border my-2" />,
-  table: ({ children }) => (
+  table: ({ children }: any) => (
     <div className="overflow-x-auto my-2">
       <table className="w-full text-[12px] border-collapse">{children}</table>
     </div>
   ),
-  thead: ({ children }) => <thead className="border-b border-border">{children}</thead>,
-  th: ({ children }) => <th className="text-left px-2 py-1.5 text-zinc-400 font-medium text-[11px]">{children}</th>,
-  td: ({ children }) => <td className="px-2 py-1 text-zinc-300 border-t border-border/50">{children}</td>,
+  thead: ({ children }: any) => <thead className="border-b border-border">{children}</thead>,
+  th: ({ children }: any) => <th className="text-left px-2 py-1.5 text-zinc-400 font-medium text-[11px]">{children}</th>,
+  td: ({ children }: any) => <td className="px-2 py-1 text-zinc-300 border-t border-border/50">{children}</td>,
 };
 
 /** Keep visited tabs mounted but hidden for instant switching */
-function TabPane({ active, visited, children }) {
+function TabPane({ active, visited, children }: { active: boolean; visited: boolean; children: React.ReactNode }) {
   if (!visited) return null;
   return (
     <div className={`${active ? 'flex-1 flex flex-col min-h-0' : 'hidden'}`}>
@@ -62,7 +64,7 @@ function TabPane({ active, visited, children }) {
   );
 }
 
-function TabLoadingOverlay({ loading }) {
+function TabLoadingOverlay({ loading }: { loading: boolean }) {
   if (!loading) return null;
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg/82 backdrop-blur-[2px]">
@@ -79,11 +81,11 @@ const SYSTEM_FINDING_IDS = new Set(['stale-timeout', 'cancelled-by-user', 'agent
 const MOBILE_VIEWPORT_PATTERNS = /\bmobile\b|\bphone\b|\biphone\b|\bandroid\b|\bsmall screen\b/i;
 const DESKTOP_VIEWPORT_PATTERNS = /\bdesktop\b|\blarge screen\b|\bwide screen\b/i;
 
-function isSystemFinding(f) {
+function isSystemFinding(f: any) {
   return SYSTEM_FINDING_IDS.has(f.id) || f.system === true;
 }
 
-function normalizeViewportBucket(value) {
+function normalizeViewportBucket(value: string | undefined | null): string {
   const raw = String(value || '').toLowerCase();
   if (!raw) return 'shared';
   if (raw.includes('mobile') || raw.includes('phone')) return 'mobile';
@@ -91,7 +93,7 @@ function normalizeViewportBucket(value) {
   return 'shared';
 }
 
-function inferFindingViewport(finding) {
+function inferFindingViewport(finding: any): string {
   const explicit = normalizeViewportBucket(finding?.viewport);
   if (explicit !== 'shared') return explicit;
 
@@ -112,18 +114,18 @@ function inferFindingViewport(finding) {
   return 'shared';
 }
 
-function viewportLabel(bucket) {
+function viewportLabel(bucket: string): string {
   return bucket === 'mobile' ? 'Mobile' : bucket === 'desktop' ? 'Desktop' : 'Shared';
 }
 
-function groupFindingsByViewport(findings) {
-  return findings.reduce((acc, finding) => {
+function groupFindingsByViewport(findings: any[]) {
+  return findings.reduce((acc: Record<string, any[]>, finding: any) => {
     acc[inferFindingViewport(finding)].push(finding);
     return acc;
   }, { desktop: [], mobile: [], shared: [] });
 }
 
-function CopyButton({ getText }) {
+function CopyButton({ getText }: { getText: () => string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -248,8 +250,8 @@ export default function SessionPanel() {
   const orchestratorActive = orchStarted && !orchPaused;
 
   const managedSessionsByTask = useMemo(() => {
-    const byTask = {};
-    for (const session of smSessions) {
+    const byTask: Record<string, any> = {};
+    for (const session of smSessions as any[]) {
       if (!session.taskId || session.isController) continue;
       if (!['healthy', 'stale', 'duplicate'].includes(session.status)) continue;
 
@@ -468,7 +470,7 @@ function SessionOutputTab({
   activeTaskId, results, taskOptions, sessionId, orchestratorActive, managedSession, gatewayStatus, loading,
   entries, truncated, loadingEarlier, loadEarlier, clearHistory, selectTask,
   onLoadingChange, chatMsg, setChatMsg, chatSending, sendChat, outputEndRef,
-}) {
+}: any) {
   const { project } = useProjectConfig();
 
   const [splitView, setSplitView] = useState(() => {
@@ -715,7 +717,7 @@ function StoriesTab() {
   return (
     <div className="flex-1 overflow-y-auto">
       {TASKS.map(t => {
-        const d = results[t.id] || {};
+        const d: Record<string, any> = results[t.id] || {};
         const s = normalizeStatus(d);
         const isOpen = expanded === t.id;
 
@@ -769,9 +771,9 @@ function StoriesTab() {
 
 // ── File Viewer Tab (Memory / Requirements / Reports) ───────────
 
-function FileViewerTab({ folder, title, onLoadingChange }) {
-  const [files, setFiles] = useState([]);
-  const [selectedFile, setSelectedFile] = useState(null);
+function FileViewerTab({ folder, title, onLoadingChange }: { folder: string; title: string; onLoadingChange?: (loading: boolean) => void }) {
+  const [files, setFiles] = useState<any[]>([]);
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -886,7 +888,7 @@ function FileViewerTab({ folder, title, onLoadingChange }) {
  * Visible when the last entry is a tool_call (awaiting result), an assistant
  * thinking part, or a tool_result (agent is formulating next response).
  */
-function ThinkingIndicator({ entries, taskId }) {
+function ThinkingIndicator({ entries, taskId }: { entries: any[]; taskId: string }) {
   const { results } = useDashboard();
   const taskStatus = results[taskId]?.status;
 
@@ -918,7 +920,7 @@ function ThinkingIndicator({ entries, taskId }) {
   );
 }
 
-function ThinkingBlock({ part }) {
+function ThinkingBlock({ part }: { part: any }) {
   const [expanded, setExpanded] = useState(false);
   const hasMore = part.fullText && part.fullText.length > part.text.length;
 
@@ -942,7 +944,7 @@ function ThinkingBlock({ part }) {
   );
 }
 
-function SessionEntry({ entry }) {
+function SessionEntry({ entry }: { entry: any }) {
   const [collapsed, setCollapsed] = useState(true);
 
   switch (entry.kind) {
@@ -1064,7 +1066,7 @@ function SessionEntry({ entry }) {
 // ── Task Results Tab ────────────────────────────────────────────
 
 /** Collapsible app log snippet for a finding */
-function FindingLogSnippet({ taskId, findingId }) {
+function FindingLogSnippet({ taskId, findingId }: { taskId: string; findingId: string }) {
   const [open, setOpen] = useState(false);
   const [log, setLog] = useState(null); // null=not loaded, ''=no data
   const [loading, setLoading] = useState(false);
@@ -1105,7 +1107,7 @@ function FindingLogSnippet({ taskId, findingId }) {
   );
 }
 
-function TaskResultsList({ tasks, results, addLog }) {
+function TaskResultsList({ tasks, results, addLog }: { tasks: any[]; results: Record<string, any>; addLog: (agent: string, msg: string, logType?: string) => void }) {
   const [copiedId, setCopiedId] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [resolvedFindings, setResolvedFindings] = useState(() => {
@@ -1418,7 +1420,7 @@ function TaskResultsList({ tasks, results, addLog }) {
 
 // ── Recordings Tab ──────────────────────────────────────────────
 
-function RecordingsTab({ onLoadingChange }) {
+function RecordingsTab({ onLoadingChange }: { onLoadingChange?: (loading: boolean) => void }) {
   const [recordings, setRecordings] = useState({ active: [], saved: [] });
   const [loading, setLoading] = useState(true);
   const [selectedTaskId, setSelectedTaskId] = useState(null);
@@ -1520,7 +1522,7 @@ function RecordingsTab({ onLoadingChange }) {
   );
 }
 
-function ResultJsonToggle({ data }) {
+function ResultJsonToggle({ data }: { data: any }) {
   const [show, setShow] = useState(false);
   if (!data || Object.keys(data).length === 0) return null;
   return (

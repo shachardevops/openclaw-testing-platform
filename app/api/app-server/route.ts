@@ -194,6 +194,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    if (!config.command) {
+      return Response.json({ ok: false, error: 'No command configured for targetApp' }, { status: 400 });
+    }
+
     const logFile = appLogPath();
     const logDir = path.dirname(logFile);
     if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true });

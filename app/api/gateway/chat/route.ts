@@ -26,12 +26,12 @@ export async function POST(request: NextRequest) {
     }
 
     if (!stream) {
-      const result = await sendChat(agentId, message, { user, sessionKey });
+      const result = await sendChat(agentId ?? null, message, { user, sessionKey });
       return Response.json({ ok: true, result });
     }
 
     // Streaming mode — proxy SSE
-    const upstream = await streamChat(agentId, message, { user });
+    const upstream = await streamChat(agentId ?? null, message, { user });
 
     return new Response(upstream, {
       headers: {

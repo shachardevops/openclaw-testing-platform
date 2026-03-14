@@ -3,6 +3,16 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 interface SessionInfo {
+  sessionId: string;
+  status: string;
+  key?: string;
+  isController?: boolean;
+  taskId?: string;
+  model?: string;
+  ageMs?: number;
+  escalation?: { level: number };
+  lastActivityTs?: number;
+  updatedAt?: number;
   [key: string]: unknown;
 }
 
@@ -29,7 +39,7 @@ interface SessionManagerState {
   issues?: unknown[];
   actionLog?: unknown[];
   debugLog?: unknown[];
-  lastError?: string | null;
+  lastError?: { ts: number; message: string } | null;
   errorCount?: number;
   consecutiveEmptyScans?: number;
   canSpawn?: CanSpawnInfo;

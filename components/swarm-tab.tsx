@@ -386,7 +386,7 @@ export default function SwarmTab() {
     sendNudge, sendSwap, sendKill,
     setAutonomyLevel, confirmAction, denyAction,
     pause, resume, loading,
-  } = useSwarm(true, 5000);
+  } = useSwarm(true, 5000) as any;
 
   const [showTimeline, setShowTimeline] = useState(false);
 

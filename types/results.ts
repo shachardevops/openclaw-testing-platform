@@ -21,6 +21,7 @@ export interface TaskResult {
   updatedAt?: string;
   finishedAt?: string;
   findings?: Finding[];
+  progressLabel?: string;
   lastLog?: string;
   model?: string;
   skills?: string[];

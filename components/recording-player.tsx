@@ -2,10 +2,71 @@
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 
+interface Frame {
+  index: number;
+  ts: number;
+  absTs: number;
+  pageUrl?: string | null;
+  file: string;
+  w?: number;
+  h?: number;
+}
+
+interface ManifestEvent {
+  ts: number;
+  absTs?: number;
+  type: string;
+  data: Record<string, any>;
+}
+
+interface Manifest {
+  active?: boolean;
+  startedAt?: string;
+  stoppedAt?: string;
+  durationMs?: number;
+  frameCount?: number;
+  frameIntervalMs?: number;
+  frames: Frame[];
+  events: ManifestEvent[];
+}
+
+type EventMarker = ManifestEvent & {
+  position: number;
+  viewport: string;
+};
+
+interface RecordingPlayerProps {
+  taskId: string;
+  onClose?: () => void;
+  jumpToFindingId?: string | null;
+}
+
+type Viewport = 'mobile' | 'tablet' | 'desktop' | 'shared';
+
+interface ViewportSection {
+  viewport: string;
+  startIndex: number;
+  endIndex: number;
+  startTs: number;
+  endTs: number;
+  frameCount: number;
+  width: number | null;
+  height: number | null;
+}
+
+interface ViewportSummaryEntry {
+  frames: number;
+  sections: ViewportSection[];
+  findings: EventMarker[];
+  appLogs: EventMarker[];
+}
+
+type ViewportSummary = Record<Viewport, ViewportSummaryEntry>;
+
 const MOBILE_VIEWPORT_MAX_WIDTH = 768;
 const TABLET_VIEWPORT_MAX_WIDTH = 1024;
 
-function normalizeViewport(value) {
+function normalizeViewport(value: unknown): string {
   const raw = String(value || '').toLowerCase();
   if (!raw) return 'shared';
   if (raw.includes('mobile') || raw.includes('phone')) return 'mobile';
@@ -14,14 +75,14 @@ function normalizeViewport(value) {
   return 'shared';
 }
 
-function classifyViewportFromWidth(width) {
-  if (!Number.isFinite(width) || width <= 0) return 'shared';
+function classifyViewportFromWidth(width: number | undefined): Viewport {
+  if (!Number.isFinite(width) || !width || width <= 0) return 'shared';
   if (width <= MOBILE_VIEWPORT_MAX_WIDTH) return 'mobile';
   if (width <= TABLET_VIEWPORT_MAX_WIDTH) return 'tablet';
   return 'desktop';
 }
 
-function viewportLabel(viewport) {
+function viewportLabel(viewport: string): string {
   if (viewport === 'mobile') return 'Mobile';
   if (viewport === 'tablet') return 'Tablet';
   if (viewport === 'desktop') return 'Desktop';
@@ -34,23 +95,23 @@ function viewportLabel(viewport) {
  * Shows the recording frames with a scrubable timeline below.
  * Event markers (findings, navigations, errors) are displayed on the timeline.
  */
-export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
-  const [manifest, setManifest] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [hoveredEvent, setHoveredEvent] = useState(null);
-  const [selectedEvent, setSelectedEvent] = useState(null);
+export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }: RecordingPlayerProps) {
+  const [manifest, setManifest] = useState<Manifest | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentIndex, setCurrentIndex] = useState<number>(0);
+  const [playing, setPlaying] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
+  const [hoveredEvent, setHoveredEvent] = useState<EventMarker | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventMarker | null>(null);
 
-  const imgRef = useRef(null);
-  const playTimerRef = useRef(null);
-  const timelineRef = useRef(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const playTimerRef = useRef<ReturnType<typeof setInterval>>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
-  const [isLive, setIsLive] = useState(false);
-  const [followLive, setFollowLive] = useState(true);
-  const liveTimerRef = useRef(null);
+  const [isLive, setIsLive] = useState<boolean>(false);
+  const [followLive, setFollowLive] = useState<boolean>(true);
+  const liveTimerRef = useRef<ReturnType<typeof setInterval>>(null);
 
   // Load manifest
   useEffect(() => {
@@ -58,9 +119,9 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     setError(null);
     fetch(`/api/recording?action=manifest&taskId=${encodeURIComponent(taskId)}`)
       .then(r => r.json())
-      .then(data => {
+      .then((data: { ok: boolean; manifest?: Manifest; error?: string }) => {
         if (data.ok) {
-          setManifest(data.manifest);
+          setManifest(data.manifest!);
           setCurrentIndex(0);
           setIsLive(!!data.manifest?.active);
         } else {
@@ -68,7 +129,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
         }
         setLoading(false);
       })
-      .catch(e => {
+      .catch((e: Error) => {
         setError(e.message);
         setLoading(false);
       });
@@ -80,7 +141,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     liveTimerRef.current = setInterval(() => {
       fetch(`/api/recording?action=manifest&taskId=${encodeURIComponent(taskId)}`)
         .then(r => r.json())
-        .then(data => {
+        .then((data: { ok: boolean; manifest?: Manifest }) => {
           if (!data.ok || !data.manifest) return;
           const newFrames = data.manifest.frames || [];
           const oldLen = manifest?.frames?.length || 0;
@@ -93,7 +154,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
         })
         .catch(() => {});
     }, 2000);
-    return () => clearInterval(liveTimerRef.current);
+    return () => clearInterval(liveTimerRef.current!);
   }, [isLive, taskId, manifest?.frames?.length, followLive]);
 
   const frames = manifest?.frames || [];
@@ -102,7 +163,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
   const currentFrame = frames[currentIndex];
   const currentViewport = currentFrame ? classifyViewportFromWidth(currentFrame.w) : 'shared';
 
-  const findClosestFrameIndex = useCallback((targetTs) => {
+  const findClosestFrameIndex = useCallback((targetTs: number): number => {
     if (frames.length === 0) return 0;
     let closest = 0;
     let minDist = Infinity;
@@ -116,7 +177,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     return closest;
   }, [frames]);
 
-  const jumpToTimestamp = useCallback((targetTs, opts = {}) => {
+  const jumpToTimestamp = useCallback((targetTs: number, opts: { followLive?: boolean; keepSelection?: boolean } = {}) => {
     setFollowLive(!!opts.followLive);
     setCurrentIndex(findClosestFrameIndex(targetTs));
     setPlaying(false);
@@ -124,13 +185,13 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
   }, [findClosestFrameIndex]);
 
   /** Distance in ms between a timestamp and the closest frame */
-  const frameGapMs = useCallback((targetTs) => {
+  const frameGapMs = useCallback((targetTs: number): number => {
     if (frames.length === 0) return Infinity;
     const idx = findClosestFrameIndex(targetTs);
     return Math.abs(frames[idx].ts - targetTs);
   }, [frames, findClosestFrameIndex]);
 
-  const inferEventViewport = useCallback((event) => {
+  const inferEventViewport = useCallback((event: ManifestEvent): string => {
     const explicit = normalizeViewport(event?.data?.viewport);
     if (explicit !== 'shared') return explicit;
     const nearestFrame = frames[findClosestFrameIndex(event?.ts || 0)];
@@ -138,7 +199,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
   }, [findClosestFrameIndex, frames]);
 
   // Auto-jump to a specific finding on manifest load
-  const jumpedRef = useRef(false);
+  const jumpedRef = useRef<boolean>(false);
   useEffect(() => {
     jumpedRef.current = false;
   }, [taskId, jumpToFindingId]);
@@ -146,7 +207,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
   useEffect(() => {
     if (!jumpToFindingId || !manifest || jumpedRef.current || frames.length === 0) return;
     const findingEvent = events.find(
-      e => e.type === 'finding' && e.data?.id === jumpToFindingId
+      (e: ManifestEvent) => e.type === 'finding' && e.data?.id === jumpToFindingId
     );
     if (!findingEvent) return;
     jumpToTimestamp(findingEvent.ts);
@@ -177,7 +238,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     if (!playing || frames.length === 0) return;
     const interval = (manifest?.frameIntervalMs || 1000) / playbackSpeed;
     playTimerRef.current = setInterval(() => {
-      setCurrentIndex(prev => {
+      setCurrentIndex((prev: number) => {
         if (prev >= frames.length - 1) {
           setPlaying(false);
           return prev;
@@ -185,7 +246,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
         return prev + 1;
       });
     }, interval);
-    return () => clearInterval(playTimerRef.current);
+    return () => clearInterval(playTimerRef.current!);
   }, [playing, playbackSpeed, frames.length, manifest?.frameIntervalMs]);
 
   const togglePlay = useCallback(() => {
@@ -193,26 +254,26 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
       setCurrentIndex(0);
       setPlaying(true);
     } else {
-      setPlaying(p => !p);
+      setPlaying((p: boolean) => !p);
     }
   }, [currentIndex, frames.length]);
 
   // Keyboard controls
   useEffect(() => {
-    const handler = (e) => {
+    const handler = (e: KeyboardEvent) => {
       // Don't capture keys when user is typing in an input or textarea
-      const tag = e.target?.tagName;
-      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target as HTMLElement)?.isContentEditable) return;
       if (e.key === ' ') { e.preventDefault(); togglePlay(); }
-      if (e.key === 'ArrowLeft') { setPlaying(false); setFollowLive(false); setCurrentIndex(i => Math.max(0, i - 1)); }
-      if (e.key === 'ArrowRight') { setPlaying(false); setFollowLive(false); setCurrentIndex(i => Math.min(frames.length - 1, i + 1)); }
+      if (e.key === 'ArrowLeft') { setPlaying(false); setFollowLive(false); setCurrentIndex((i: number) => Math.max(0, i - 1)); }
+      if (e.key === 'ArrowRight') { setPlaying(false); setFollowLive(false); setCurrentIndex((i: number) => Math.min(frames.length - 1, i + 1)); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [togglePlay, frames.length]);
 
   // Jump to position on timeline click
-  const handleTimelineClick = useCallback((e) => {
+  const handleTimelineClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (!timelineRef.current || frames.length === 0) return;
     const rect = timelineRef.current.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -222,35 +283,35 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
   }, [frames.length, durationMs, jumpToTimestamp]);
 
   // Categorize events for the timeline
-  const eventMarkers = useMemo(() => {
+  const eventMarkers = useMemo((): EventMarker[] => {
     if (!durationMs || events.length === 0) return [];
     return events
-      .filter(e => ['finding', 'navigation', 'error', 'session', 'app_log'].includes(e.type))
-      .map(e => ({
+      .filter((e: ManifestEvent) => ['finding', 'navigation', 'error', 'session', 'app_log'].includes(e.type))
+      .map((e: ManifestEvent) => ({
         ...e,
         position: Math.min(100, (e.ts / durationMs) * 100),
         viewport: inferEventViewport(e),
       }));
   }, [events, durationMs, inferEventViewport]);
 
-  const findingMarkers = useMemo(() =>
-    eventMarkers.filter(e => e.type === 'finding'), [eventMarkers]
+  const findingMarkers = useMemo((): EventMarker[] =>
+    eventMarkers.filter((e: EventMarker) => e.type === 'finding'), [eventMarkers]
   );
 
-  const navMarkers = useMemo(() =>
-    eventMarkers.filter(e => e.type === 'navigation'), [eventMarkers]
+  const navMarkers = useMemo((): EventMarker[] =>
+    eventMarkers.filter((e: EventMarker) => e.type === 'navigation'), [eventMarkers]
   );
 
-  const appLogMarkers = useMemo(() =>
-    eventMarkers.filter(e => e.type === 'app_log'), [eventMarkers]
+  const appLogMarkers = useMemo((): EventMarker[] =>
+    eventMarkers.filter((e: EventMarker) => e.type === 'app_log'), [eventMarkers]
   );
 
-  const viewportSections = useMemo(() => {
+  const viewportSections = useMemo((): ViewportSection[] => {
     if (frames.length === 0) return [];
 
-    const sections = [];
+    const sections: ViewportSection[] = [];
     let startIndex = 0;
-    let bucket = classifyViewportFromWidth(frames[0]?.w);
+    let bucket: string | null = classifyViewportFromWidth(frames[0]?.w);
 
     for (let i = 1; i <= frames.length; i++) {
       const nextBucket = i < frames.length ? classifyViewportFromWidth(frames[i]?.w) : null;
@@ -258,7 +319,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
         const startFrame = frames[startIndex];
         const endFrame = frames[i - 1];
         sections.push({
-          viewport: bucket,
+          viewport: bucket!,
           startIndex,
           endIndex: i - 1,
           startTs: startFrame?.ts || 0,
@@ -275,8 +336,8 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     return sections;
   }, [frames]);
 
-  const viewportSummary = useMemo(() => {
-    const summary = {
+  const viewportSummary = useMemo((): ViewportSummary => {
+    const summary: ViewportSummary = {
       desktop: { frames: 0, sections: [], findings: [], appLogs: [] },
       tablet: { frames: 0, sections: [], findings: [], appLogs: [] },
       mobile: { frames: 0, sections: [], findings: [], appLogs: [] },
@@ -288,21 +349,21 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     }
 
     for (const section of viewportSections) {
-      summary[section.viewport].sections.push(section);
+      summary[section.viewport as Viewport].sections.push(section);
     }
 
     for (const marker of findingMarkers) {
-      summary[marker.viewport || 'shared'].findings.push(marker);
+      summary[(marker.viewport || 'shared') as Viewport].findings.push(marker);
     }
 
     for (const marker of appLogMarkers) {
-      summary[marker.viewport || 'shared'].appLogs.push(marker);
+      summary[(marker.viewport || 'shared') as Viewport].appLogs.push(marker);
     }
 
     return summary;
   }, [frames, viewportSections, findingMarkers, appLogMarkers]);
 
-  const formatTime = (ms) => {
+  const formatTime = (ms: number): string => {
     const s = Math.floor(ms / 1000);
     const m = Math.floor(s / 60);
     const sec = s % 60;
@@ -333,7 +394,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
     );
   }
 
-  const sevColor = (sev) => {
+  const sevColor = (sev: string | undefined): string => {
     if (!sev) return 'bg-zinc-500';
     const s = sev.toUpperCase();
     if (s === 'P1' || s === 'BUG') return 'bg-red-500';
@@ -380,10 +441,10 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
 
       {frames.length > 0 && (
         <div className="shrink-0 grid grid-cols-1 gap-2 border-b border-border bg-card/15 px-3 py-2 md:grid-cols-3 max-h-[140px] overflow-y-auto">
-          {['desktop', 'tablet', 'mobile'].filter(vp => viewportSummary[vp].frames > 0 || currentViewport === vp).map((viewport) => {
+          {(['desktop', 'tablet', 'mobile'] as Viewport[]).filter(vp => viewportSummary[vp].frames > 0 || currentViewport === vp).map((viewport) => {
             const summary = viewportSummary[viewport];
             const isActiveViewport = currentViewport === viewport;
-            const vpColors = {
+            const vpColors: Record<string, { active: string; dot: string; btn: string }> = {
               mobile: { active: 'border-amber-300/40 bg-amber-300/8', dot: 'bg-amber-300', btn: 'border-amber-300/20 bg-amber-300/6 text-amber-200 hover:bg-amber-300/12' },
               tablet: { active: 'border-purple-400/40 bg-purple-400/8', dot: 'bg-purple-400', btn: 'border-purple-400/20 bg-purple-400/6 text-purple-200 hover:bg-purple-400/12' },
               desktop: { active: 'border-blue-400/35 bg-blue-400/8', dot: 'bg-blue-400', btn: 'border-blue-400/20 bg-blue-400/6 text-blue-200 hover:bg-blue-400/12' },
@@ -686,7 +747,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
               style={{ left: `${marker.position}%` }}
               onMouseEnter={() => setHoveredEvent(marker)}
               onMouseLeave={() => setHoveredEvent(null)}
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 jumpToTimestamp(marker.ts, { keepSelection: true });
                 setSelectedEvent(marker);
@@ -717,7 +778,7 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
               style={{ left: `${marker.position}%` }}
               onMouseEnter={() => setHoveredEvent(marker)}
               onMouseLeave={() => setHoveredEvent(null)}
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
                 jumpToTimestamp(marker.ts, { keepSelection: true });
                 setSelectedEvent(marker);
@@ -730,12 +791,12 @@ export default function RecordingPlayer({ taskId, onClose, jumpToFindingId }) {
           ))}
         </div>
 
-        {['desktop', 'tablet', 'mobile', 'shared'].some((viewport) => {
+        {(['desktop', 'tablet', 'mobile', 'shared'] as Viewport[]).some((viewport) => {
           const summary = viewportSummary[viewport];
           return summary.findings.length > 0 || summary.appLogs.length > 0;
         }) && (
           <div className="space-y-2 px-3 pb-3 overflow-y-auto min-h-0">
-            {['desktop', 'tablet', 'mobile', 'shared'].map((viewport) => {
+            {(['desktop', 'tablet', 'mobile', 'shared'] as Viewport[]).map((viewport) => {
               const summary = viewportSummary[viewport];
               if (summary.findings.length === 0 && summary.appLogs.length === 0) return null;
 

@@ -13,38 +13,140 @@
 
 import fs from 'fs';
 import path from 'path';
-import { resultsDir, reportsDir } from './config.js';
-import { getProjectConfig } from './project-loader.js';
-import { parseFindingsFromReport } from './report-parser.js';
+import { resultsDir, reportsDir } from './config';
+import { getProjectConfig } from './project-loader';
+import { parseFindingsFromReport } from './report-parser';
 import {
   discoverTarget,
   startScreencast,
   DEFAULT_CDP_PORT,
-} from './browser-screencast.js';
-import appLogRing from './app-log-ring.js';
+} from './browser-screencast';
+import appLogRing from './app-log-ring';
+
+// ─── Interfaces ─────────────────────────────────────────────────
+
+interface RecordingSessionOptions {
+  frameIntervalMs?: number;
+  quality?: number;
+  maxWidth?: number;
+  maxHeight?: number;
+}
+
+interface Frame {
+  index: number;
+  ts: number;
+  absTs: number;
+  pageUrl: string | null;
+  file: string;
+  w?: number;
+  h?: number;
+}
+
+interface Event {
+  ts: number;
+  absTs: number;
+  type: string;
+  data: Record<string, unknown>;
+}
+
+interface Finding {
+  id?: string;
+  severity?: string;
+  title?: string;
+  module?: string;
+  viewport?: string;
+  createdAt?: string;
+  foundAt?: string;
+  timestamp?: string;
+}
+
+interface RecordingStatus {
+  taskId: string;
+  recording: boolean;
+  frameCount: number;
+  eventCount: number;
+  cdpTargetId: string | null;
+  startedAt: string | null;
+  durationMs: number;
+}
+
+interface Manifest {
+  taskId: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  durationMs: number;
+  active: boolean;
+  frameCount: number;
+  frameIntervalMs: number;
+  frames: Frame[];
+  events: Event[];
+}
+
+interface SavedRecordingEntry {
+  taskId: string;
+  startedAt: string;
+  stoppedAt: string | null;
+  durationMs: number;
+  frameCount: number;
+  eventCount: number;
+  findingCount: number;
+  active: boolean;
+}
 
 const APP_LOG_ERROR_PATTERNS = /error|err!|econnrefused|enotfound|eacces|eaddrinuse|typeerror|referenceerror|syntaxerror|failed|fatal|panic|unhandled/i;
 const APP_LOG_WARN_PATTERNS = /warn|warning|deprecated|⚠/i;
 
-function getWorkspace() {
+function getWorkspace(): string {
   const { project } = getProjectConfig();
   return project.workspace || process.cwd();
 }
 
-function recordingsBaseDir() {
+function recordingsBaseDir(): string {
   return path.join(getWorkspace(), 'recordings');
 }
 
-function recordingDir(taskId) {
+function recordingDir(taskId: string): string {
   return path.join(recordingsBaseDir(), taskId);
 }
 
 // ─── Active Recordings Registry ─────────────────────────────────
 
-const activeRecordings = new Map(); // taskId → RecordingSession
+const activeRecordings = new Map<string, RecordingSession>(); // taskId → RecordingSession
 
 class RecordingSession {
-  constructor(taskId, opts = {}) {
+  taskId: string;
+  dir: string;
+  frameInterval: number;
+  quality: number;
+  maxWidth: number;
+  maxHeight: number;
+
+  frameCount: number;
+  startedAt: number | null;
+  stoppedAt: number | null;
+  events: Event[];
+  frames: Frame[];
+  cdpTargetId: string | undefined;
+
+  private _screencast: any;
+  private _lastFrameAt: number;
+  private _currentPageUrl: string | null;
+  private _lastFrameSize: number;
+  private _lastFrameHash: string | null;
+  private _duplicateCount: number;
+  private _maxStaleFrames: number;
+  private _lastManifestSave: number;
+  private _manifestSaveInterval: number;
+  private _lastSavedFrameAt: number;
+  private _keyframeIntervalMs: number;
+  private _lastAppLogTs: number;
+  private _appLogTimer: ReturnType<typeof setInterval> | null;
+  private _findingSyncTimer: ReturnType<typeof setInterval> | null;
+  private _reconnectTimer: ReturnType<typeof setTimeout> | null;
+  private _reconnectAttempts: number;
+  private _stopped: boolean;
+
+  constructor(taskId: string, opts: RecordingSessionOptions = {}) {
     this.taskId = taskId;
     this.dir = recordingDir(taskId);
     this.frameInterval = opts.frameIntervalMs || 1000; // ~1fps
@@ -70,12 +172,13 @@ class RecordingSession {
     this._keyframeIntervalMs = 15000;   // always save at least one frame every 15s
     this._lastAppLogTs = 0;
     this._appLogTimer = null;
+    this._findingSyncTimer = null;
     this._reconnectTimer = null;
     this._reconnectAttempts = 0;
     this._stopped = false;
   }
 
-  async start() {
+  async start(): Promise<void> {
     appLogRing.start();
     this._stopped = false;
 
@@ -98,19 +201,21 @@ class RecordingSession {
     try {
       await this._connectScreencast();
       console.log(`[recorder:${this.taskId}] Recording started (browser connected)`);
-    } catch (e) {
-      console.log(`[recorder:${this.taskId}] Recording started (browser not ready yet, will retry: ${e.message})`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.log(`[recorder:${this.taskId}] Recording started (browser not ready yet, will retry: ${message})`);
       this._attemptReconnect();
     }
   }
 
-  async _connectScreencast() {
+  private async _connectScreencast(): Promise<void> {
     // Connect to browser
-    let target;
+    let target: any;
     try {
       target = await discoverTarget(DEFAULT_CDP_PORT);
-    } catch (e) {
-      throw new Error(`Cannot connect to browser: ${e.message}`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      throw new Error(`Cannot connect to browser: ${message}`);
     }
 
     this._currentPageUrl = target.pageUrl;
@@ -134,10 +239,10 @@ class RecordingSession {
       maxHeight: this.maxHeight,
       everyNthFrame: 1,
       keepaliveMs: 10000,
-      onFrame: ({ data, metadata }) => {
+      onFrame: ({ data, metadata }: { data: string; metadata: any }) => {
         this._handleFrame(data, metadata);
       },
-      onError: (e) => {
+      onError: (e: Error) => {
         console.error(`[recorder:${this.taskId}] Screencast error:`, e.message);
         this.addEvent('error', { message: e.message });
       },
@@ -149,7 +254,7 @@ class RecordingSession {
     });
   }
 
-  _attemptReconnect() {
+  private _attemptReconnect(): void {
     if (this._stopped) return;
     this._reconnectAttempts++;
     // Backoff: 3s, 6s, 9s, ... capped at 30s — no max attempts, keeps trying until stopped
@@ -164,23 +269,24 @@ class RecordingSession {
         this._reconnectAttempts = 0;
         this.addEvent('reconnected', {});
         console.log(`[recorder:${this.taskId}] Reconnected successfully`);
-      } catch (e) {
+      } catch (e: unknown) {
+        const message = e instanceof Error ? e.message : String(e);
         if (this._reconnectAttempts <= 5 || this._reconnectAttempts % 10 === 0) {
-          console.warn(`[recorder:${this.taskId}] Reconnect failed:`, e.message);
+          console.warn(`[recorder:${this.taskId}] Reconnect failed:`, message);
         }
         this._attemptReconnect();
       }
     }, delay);
   }
 
-  _captureAppLogEvents() {
-    const entries = appLogRing.getEntriesSince(this._lastAppLogTs);
+  private _captureAppLogEvents(): void {
+    const entries: Array<{ ts: number; text: string }> = appLogRing.getEntriesSince(this._lastAppLogTs);
     if (entries.length === 0) return;
 
     for (const entry of entries) {
       this._lastAppLogTs = Math.max(this._lastAppLogTs, entry.ts);
 
-      const severity = APP_LOG_ERROR_PATTERNS.test(entry.text)
+      const severity: string | null = APP_LOG_ERROR_PATTERNS.test(entry.text)
         ? 'error'
         : APP_LOG_WARN_PATTERNS.test(entry.text)
           ? 'warn'
@@ -198,7 +304,7 @@ class RecordingSession {
     }
   }
 
-  _handleFrame(base64Data, metadata) {
+  private _handleFrame(base64Data: string, metadata: any): void {
     const now = Date.now();
     // Throttle to ~1fps
     if (now - this._lastFrameAt < this.frameInterval) return;
@@ -237,13 +343,14 @@ class RecordingSession {
     // Write frame to disk
     try {
       fs.writeFileSync(filePath, buf);
-    } catch (e) {
-      console.error(`[recorder:${this.taskId}] Failed to write frame:`, e.message);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error(`[recorder:${this.taskId}] Failed to write frame:`, message);
       return;
     }
 
     // Track page URL from metadata if available
-    const elapsed = now - this.startedAt;
+    const elapsed = now - (this.startedAt as number);
 
     this.frames.push({
       index,
@@ -262,7 +369,7 @@ class RecordingSession {
     }
   }
 
-  addEvent(type, data) {
+  addEvent(type: string, data: Record<string, unknown>): void {
     const ts = this.startedAt ? Date.now() - this.startedAt : 0;
     this.events.push({ ts, absTs: Date.now(), type, data });
   }
@@ -271,8 +378,8 @@ class RecordingSession {
    * Add a finding from the task results to the timeline.
    * Uses createdAt timestamp to position the marker correctly in the timeline.
    */
-  addFinding(finding) {
-    const data = {
+  addFinding(finding: Finding): void {
+    const data: Record<string, unknown> = {
       id: finding.id,
       severity: finding.severity,
       title: finding.title,
@@ -295,7 +402,7 @@ class RecordingSession {
   /**
    * Add a page navigation event.
    */
-  addNavigation(url) {
+  addNavigation(url: string): void {
     this._currentPageUrl = url;
     this.addEvent('navigation', { url });
   }
@@ -303,11 +410,11 @@ class RecordingSession {
   /**
    * Add a session message event (from session history).
    */
-  addSessionEvent(kind, text) {
+  addSessionEvent(kind: string, text?: string): void {
     this.addEvent('session', { kind, text: text?.slice(0, 200) });
   }
 
-  stop() {
+  stop(): void {
     this._stopped = true;
     this.stoppedAt = Date.now();
 
@@ -339,12 +446,12 @@ class RecordingSession {
     console.log(`[recorder:${this.taskId}] Stopped. ${this.frameCount} frames, ${this.events.length} events`);
   }
 
-  _saveManifest() {
-    const manifest = {
+  private _saveManifest(): void {
+    const manifest: Manifest = {
       taskId: this.taskId,
-      startedAt: new Date(this.startedAt).toISOString(),
+      startedAt: new Date(this.startedAt as number).toISOString(),
       stoppedAt: this.stoppedAt ? new Date(this.stoppedAt).toISOString() : null,
-      durationMs: this.stoppedAt ? this.stoppedAt - this.startedAt : Date.now() - this.startedAt,
+      durationMs: this.stoppedAt ? this.stoppedAt - (this.startedAt as number) : Date.now() - (this.startedAt as number),
       active: !this.stoppedAt,
       frameCount: this.frameCount,
       frameIntervalMs: this.frameInterval,
@@ -357,8 +464,9 @@ class RecordingSession {
         path.join(this.dir, 'manifest.json'),
         JSON.stringify(manifest, null, 2) + '\n'
       );
-    } catch (e) {
-      console.error(`[recorder:${this.taskId}] Failed to save manifest:`, e.message);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : String(e);
+      console.error(`[recorder:${this.taskId}] Failed to save manifest:`, message);
     }
   }
 
@@ -366,9 +474,9 @@ class RecordingSession {
    * Sync findings from task results AND report markdown into the timeline.
    * Called every 10s during recording and once at stop.
    */
-  syncFindings() {
-    const existingIds = new Set(
-      this.events.filter(e => e.type === 'finding').map(e => e.data.id)
+  syncFindings(): void {
+    const existingIds = new Set<string | undefined>(
+      this.events.filter(e => e.type === 'finding').map(e => e.data.id as string | undefined)
     );
 
     // Source 1: result JSON findings (bugs written by the AI agent)
@@ -376,7 +484,7 @@ class RecordingSession {
       const resultFile = path.join(resultsDir(), `${this.taskId}.json`);
       if (fs.existsSync(resultFile)) {
         const data = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
-        for (const f of (data.findings || [])) {
+        for (const f of (data.findings || []) as Finding[]) {
           if (f.id && !existingIds.has(f.id)) {
             this.addFinding(f);
             existingIds.add(f.id);
@@ -391,7 +499,7 @@ class RecordingSession {
       const reportFile = path.join(reportsDir(), `${this.taskId}.md`);
       if (fs.existsSync(reportFile)) {
         const markdown = fs.readFileSync(reportFile, 'utf8');
-        const reportFindings = parseFindingsFromReport(markdown);
+        const reportFindings: Finding[] = parseFindingsFromReport(markdown);
         for (const f of reportFindings) {
           if (f.id && !existingIds.has(f.id)) {
             this.addFinding(f);
@@ -402,7 +510,7 @@ class RecordingSession {
     } catch {}
   }
 
-  getStatus() {
+  getStatus(): RecordingStatus {
     return {
       taskId: this.taskId,
       recording: !!this._screencast,
@@ -420,7 +528,7 @@ class RecordingSession {
 /**
  * Start recording for a task.
  */
-async function startRecording(taskId, opts = {}) {
+async function startRecording(taskId: string, opts: RecordingSessionOptions = {}): Promise<{ ok: boolean; error?: string; status?: RecordingStatus }> {
   if (activeRecordings.has(taskId)) {
     return { ok: false, error: `Already recording ${taskId}` };
   }
@@ -434,7 +542,7 @@ async function startRecording(taskId, opts = {}) {
 /**
  * Stop recording for a task. Syncs findings before stopping.
  */
-function stopRecording(taskId) {
+function stopRecording(taskId: string): { ok: boolean; error?: string; frameCount?: number; eventCount?: number } {
   const session = activeRecordings.get(taskId);
   if (!session) return { ok: false, error: `No active recording for ${taskId}` };
 
@@ -447,7 +555,7 @@ function stopRecording(taskId) {
 /**
  * Add an event to an active recording.
  */
-function addRecordingEvent(taskId, type, data) {
+function addRecordingEvent(taskId: string, type: string, data: Record<string, unknown>): void {
   const session = activeRecordings.get(taskId);
   if (!session) return;
   session.addEvent(type, data);
@@ -456,7 +564,7 @@ function addRecordingEvent(taskId, type, data) {
 /**
  * Sync findings for an active recording.
  */
-function syncRecordingFindings(taskId) {
+function syncRecordingFindings(taskId: string): void {
   const session = activeRecordings.get(taskId);
   if (!session) return;
   session.syncFindings();
@@ -465,33 +573,33 @@ function syncRecordingFindings(taskId) {
 /**
  * Get status of an active recording.
  */
-function getRecordingStatus(taskId) {
+function getRecordingStatus(taskId: string): RecordingStatus | null {
   const session = activeRecordings.get(taskId);
   if (!session) return null;
   return session.getStatus();
 }
 
-function listActiveRecordings() {
+function listActiveRecordings(): RecordingStatus[] {
   return [...activeRecordings.values()].map((session) => session.getStatus());
 }
 
 /**
  * List all recordings (active + saved).
  */
-function listRecordings() {
-  const active = [];
+function listRecordings(): { active: (RecordingStatus & { active: true })[]; saved: SavedRecordingEntry[] } {
+  const active: (RecordingStatus & { active: true })[] = [];
   for (const [taskId, session] of activeRecordings) {
-    active.push({ ...session.getStatus(), active: true });
+    active.push({ ...session.getStatus(), active: true as const });
   }
 
-  const saved = [];
+  const saved: SavedRecordingEntry[] = [];
   const baseDir = recordingsBaseDir();
   if (fs.existsSync(baseDir)) {
     for (const dir of fs.readdirSync(baseDir)) {
       const manifestPath = path.join(baseDir, dir, 'manifest.json');
       if (fs.existsSync(manifestPath)) {
         try {
-          const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+          const manifest: Manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
           saved.push({
             taskId: manifest.taskId,
             startedAt: manifest.startedAt,
@@ -499,7 +607,7 @@ function listRecordings() {
             durationMs: manifest.durationMs,
             frameCount: manifest.frameCount,
             eventCount: manifest.events?.length || 0,
-            findingCount: manifest.events?.filter(e => e.type === 'finding').length || 0,
+            findingCount: manifest.events?.filter((e: Event) => e.type === 'finding').length || 0,
             active: activeRecordings.has(manifest.taskId),
           });
         } catch {}
@@ -513,11 +621,11 @@ function listRecordings() {
 /**
  * Load a saved recording manifest.
  */
-function loadManifest(taskId) {
+function loadManifest(taskId: string): (Manifest & { active: boolean }) | null {
   const manifestPath = path.join(recordingDir(taskId), 'manifest.json');
   if (!fs.existsSync(manifestPath)) return null;
   try {
-    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as Manifest & { active: boolean };
     // Check if recording is still actively running
     manifest.active = activeRecordings.has(taskId);
     return manifest;
@@ -529,14 +637,14 @@ function loadManifest(taskId) {
 /**
  * Check if a recording manifest exists for a task (lightweight, no parsing).
  */
-function recordingExists(taskId) {
+function recordingExists(taskId: string): boolean {
   return fs.existsSync(path.join(recordingDir(taskId), 'manifest.json'));
 }
 
 /**
  * Get the file path for a recording frame.
  */
-function getFramePath(taskId, fileName) {
+function getFramePath(taskId: string, fileName: string): string | null {
   const framePath = path.join(recordingDir(taskId), fileName);
   if (!fs.existsSync(framePath)) return null;
   return framePath;

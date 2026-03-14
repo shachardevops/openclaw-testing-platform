@@ -1,9 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSessionManager } from '@/hooks/use-session-manager';
 
-const STATUS_COLORS = {
+interface ManagedSession {
+  sessionId: string;
+  status: string;
+  key?: string;
+  isController?: boolean;
+  taskId?: string;
+  model?: string;
+  ageMs?: number;
+  escalation?: { level: number };
+}
+
+interface Issue {
+  sessionId?: string;
+  taskId?: string;
+  type: string;
+  message: string;
+}
+
+interface ActionLogEntry {
+  ts: string;
+  action: string;
+  result: string;
+  sessionId?: string;
+}
+
+interface DebugLogEntry {
+  ts: string;
+  level: string;
+  message: string;
+}
+
+interface ErrorEntry {
+  ts: string;
+  message: string;
+}
+
+const STATUS_COLORS: Record<string, { dot: string; text: string; row: string }> = {
   healthy:   { dot: '#22c55e', text: 'text-green-400',  row: '' },
   stale:     { dot: '#f59e0b', text: 'text-amber-400',  row: 'bg-amber-950/20' },
   errored:   { dot: '#ef4444', text: 'text-red-400',    row: 'bg-red-950/20' },
@@ -11,15 +47,15 @@ const STATUS_COLORS = {
   duplicate: { dot: '#a855f7', text: 'text-purple-400', row: 'bg-purple-950/20' },
 };
 
-const LOG_LEVEL_COLORS = {
+const LOG_LEVEL_COLORS: Record<string, string> = {
   debug: 'text-zinc-500',
   info:  'text-blue-400',
   warn:  'text-amber-400',
   error: 'text-red-400',
 };
 
-function formatAge(ms) {
-  if (!ms || ms <= 0) return '—';
+function formatAge(ms: number | undefined) {
+  if (!ms || ms <= 0) return '\u2014';
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s`;
   const m = Math.floor(s / 60);
@@ -29,13 +65,13 @@ function formatAge(ms) {
   return `${h}h${rm > 0 ? `${rm}m` : ''}`;
 }
 
-function formatTime(ts) {
+function formatTime(ts: string | number | undefined) {
   if (!ts) return '';
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-function shortModel(model) {
-  if (!model) return '—';
+function shortModel(model: string | undefined) {
+  if (!model) return '\u2014';
   if (/opus/i.test(model)) return 'Opus';
   if (/sonnet/i.test(model)) return 'Sonnet';
   if (/haiku/i.test(model)) return 'Haiku';
@@ -52,7 +88,7 @@ export default function SessionManagerTab() {
     forceScan, nudge, swapModel, killSession, killOrphans, dedup, dedupAll, toggleEscalation,
   } = useSessionManager();
 
-  const [panel, setPanel] = useState('sessions'); // sessions | actions | debug
+  const [panel, setPanel] = useState<'sessions' | 'actions' | 'debug'>('sessions');
 
   if (loading && sessions.length === 0) {
     return (
@@ -64,9 +100,8 @@ export default function SessionManagerTab() {
 
   return (
     <div className="flex-1 flex flex-col min-h-0 bg-[#0a0a0f]">
-      {/* Header bar — CLI-style */}
+      {/* Header bar */}
       <div className="px-3 py-2 border-b border-zinc-800 flex items-center gap-3 font-mono text-[11px] flex-wrap">
-        {/* Status pills — inline like CLI */}
         <StatusCount label="healthy" count={summary.healthy} color="#22c55e" />
         <StatusCount label="stale" count={summary.stale} color="#f59e0b" />
         <StatusCount label="errored" count={summary.errored} color="#ef4444" />
@@ -116,7 +151,7 @@ export default function SessionManagerTab() {
         </div>
       </div>
 
-      {/* Tab bar for sub-panels */}
+      {/* Tab bar */}
       <div className="flex border-b border-zinc-800 font-mono text-[10px]">
         <TabBtn active={panel === 'sessions'} onClick={() => setPanel('sessions')}>
           Sessions ({sessions.length})
@@ -129,13 +164,12 @@ export default function SessionManagerTab() {
         </TabBtn>
       </div>
 
-      {/* Sessions panel — CLI-style table */}
+      {/* Sessions panel */}
       {panel === 'sessions' && (
         <div className="flex-1 min-h-0 overflow-auto">
-          {/* Issues summary */}
           {issues.length > 0 && (
             <div className="border-b border-zinc-800/50 px-3 py-2 space-y-1 max-h-[140px] overflow-y-auto">
-              {issues.slice(0, 8).map((issue, i) => (
+              {issues.slice(0, 8).map((issue: Issue, i: number) => (
                 <div key={`${issue.sessionId}-${i}`} className="flex items-center gap-2 font-mono text-[10px]">
                   <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: STATUS_COLORS[issue.type]?.dot || '#71717a' }} />
                   <span className={`flex-1 ${STATUS_COLORS[issue.type]?.text || 'text-zinc-400'} truncate`}>
@@ -143,7 +177,7 @@ export default function SessionManagerTab() {
                   </span>
                   {issue.type === 'orphaned' && issue.sessionId && (
                     <button
-                      onClick={() => killSession(issue.sessionId)}
+                      onClick={() => killSession(issue.sessionId!)}
                       className="text-[9px] text-red-500 hover:text-red-300 bg-red-950/30 border border-red-900/30 rounded px-1.5 py-0.5"
                     >
                       KILL
@@ -151,12 +185,12 @@ export default function SessionManagerTab() {
                   )}
                   {issue.type === 'stale' && issue.sessionId && (
                     <div className="flex gap-1">
-                      <button onClick={() => nudge(issue.sessionId)} className="text-[9px] text-amber-500 hover:text-amber-300 bg-amber-950/30 border border-amber-900/30 rounded px-1.5 py-0.5">NUDGE</button>
-                      <button onClick={() => killSession(issue.sessionId)} className="text-[9px] text-red-500 hover:text-red-300 bg-red-950/30 border border-red-900/30 rounded px-1.5 py-0.5">KILL</button>
+                      <button onClick={() => nudge(issue.sessionId!)} className="text-[9px] text-amber-500 hover:text-amber-300 bg-amber-950/30 border border-amber-900/30 rounded px-1.5 py-0.5">NUDGE</button>
+                      <button onClick={() => killSession(issue.sessionId!)} className="text-[9px] text-red-500 hover:text-red-300 bg-red-950/30 border border-red-900/30 rounded px-1.5 py-0.5">KILL</button>
                     </div>
                   )}
                   {issue.type === 'duplicate' && issue.taskId && (
-                    <button onClick={() => dedup(issue.taskId)} className="text-[9px] text-purple-500 hover:text-purple-300 bg-purple-950/30 border border-purple-900/30 rounded px-1.5 py-0.5">DEDUP</button>
+                    <button onClick={() => dedup(issue.taskId!)} className="text-[9px] text-purple-500 hover:text-purple-300 bg-purple-950/30 border border-purple-900/30 rounded px-1.5 py-0.5">DEDUP</button>
                   )}
                 </div>
               ))}
@@ -166,9 +200,7 @@ export default function SessionManagerTab() {
             </div>
           )}
 
-          {/* Session rows — CLI-style, compact */}
           <div className="font-mono text-[11px]">
-            {/* Header */}
             <div className="grid grid-cols-[20px_80px_1fr_100px_80px_70px_50px_100px] gap-1 px-3 py-1.5 border-b border-zinc-800 text-zinc-500 text-[9px] uppercase tracking-wider sticky top-0 bg-[#0a0a0f] z-10">
               <span></span>
               <span>Status</span>
@@ -182,31 +214,26 @@ export default function SessionManagerTab() {
 
             {sessions.length === 0 && (
               <div className="px-3 py-6 text-center text-zinc-600 text-[11px]">
-                No sessions detected{consecutiveEmptyScans > 2 ? ' — listSessions may be timing out' : ''}
+                No sessions detected{consecutiveEmptyScans > 2 ? ' \u2014 listSessions may be timing out' : ''}
               </div>
             )}
 
-            {sessions.map(s => {
+            {sessions.map((s: any) => {
               const colors = STATUS_COLORS[s.status] || STATUS_COLORS.healthy;
               return (
                 <div
                   key={s.sessionId}
                   className={`grid grid-cols-[20px_80px_1fr_100px_80px_70px_50px_100px] gap-1 px-3 py-1.5 border-b border-zinc-900/50 items-center hover:bg-zinc-800/30 transition-colors ${colors.row}`}
                 >
-                  {/* Dot */}
                   <span className="flex justify-center">
                     <span
                       className={`w-2 h-2 rounded-full ${s.status === 'stale' ? 'animate-pulse' : ''}`}
                       style={{ backgroundColor: colors.dot }}
                     />
                   </span>
-
-                  {/* Status */}
                   <span className={`text-[10px] uppercase tracking-wide ${colors.text}`}>
                     {s.status}
                   </span>
-
-                  {/* Key — full key like CLI */}
                   <span className="text-zinc-300 truncate" title={s.key || s.sessionId}>
                     {s.isController ? (
                       <span className="text-green-400">main (controller)</span>
@@ -214,30 +241,20 @@ export default function SessionManagerTab() {
                       s.key || <span className="text-zinc-600">{s.sessionId.slice(0, 16)}...</span>
                     )}
                   </span>
-
-                  {/* Task */}
                   <span className="text-zinc-400 truncate" title={s.taskId || ''}>
-                    {s.taskId || (s.isController ? 'ctrl' : '—')}
+                    {s.taskId || (s.isController ? 'ctrl' : '\u2014')}
                   </span>
-
-                  {/* Model */}
                   <span className="text-zinc-500 text-[10px]">{shortModel(s.model)}</span>
-
-                  {/* Age */}
                   <span className={`text-[10px] ${
-                    s.ageMs > 3600000 ? 'text-red-400' :
-                    s.ageMs > 600000 ? 'text-amber-400' :
+                    (s.ageMs ?? 0) > 3600000 ? 'text-red-400' :
+                    (s.ageMs ?? 0) > 600000 ? 'text-amber-400' :
                     'text-zinc-500'
                   }`}>
                     {formatAge(s.ageMs)}
                   </span>
-
-                  {/* Escalation level */}
-                  <span className={`text-[10px] ${s.escalation?.level > 0 ? 'text-amber-400' : 'text-zinc-700'}`}>
+                  <span className={`text-[10px] ${(s.escalation?.level ?? 0) > 0 ? 'text-amber-400' : 'text-zinc-700'}`}>
                     L{s.escalation?.level || 0}
                   </span>
-
-                  {/* Actions */}
                   <div className="flex gap-1 justify-end">
                     {!s.isController && (
                       <>
@@ -261,7 +278,6 @@ export default function SessionManagerTab() {
             })}
           </div>
 
-          {/* Bulk actions bar */}
           <div className="sticky bottom-0 px-3 py-2 border-t border-zinc-800 bg-[#0a0a0f] flex items-center gap-2 font-mono text-[10px]">
             {summary.orphaned > 0 && (
               <button
@@ -289,7 +305,7 @@ export default function SessionManagerTab() {
           {actionLog.length === 0 ? (
             <div className="px-3 py-6 text-center text-zinc-600">No actions recorded yet</div>
           ) : (
-            actionLog.map((entry, i) => (
+            actionLog.map((entry: ActionLogEntry, i: number) => (
               <div
                 key={i}
                 className="px-3 py-1.5 flex gap-3 border-b border-zinc-900/30 hover:bg-zinc-800/20 items-start"
@@ -318,7 +334,6 @@ export default function SessionManagerTab() {
       {/* Debug log panel */}
       {panel === 'debug' && (
         <div className="flex-1 min-h-0 overflow-auto font-mono text-[10px]">
-          {/* Error banner */}
           {lastError && (
             <div className="px-3 py-2 bg-red-950/30 border-b border-red-900/30 text-red-400">
               <div className="flex items-center gap-2">
@@ -333,7 +348,7 @@ export default function SessionManagerTab() {
           {debugLog.length === 0 ? (
             <div className="px-3 py-6 text-center text-zinc-600">No debug entries yet — waiting for first scan</div>
           ) : (
-            debugLog.map((entry, i) => (
+            debugLog.map((entry: DebugLogEntry, i: number) => (
               <div
                 key={i}
                 className={`px-3 py-1 flex gap-2 border-b border-zinc-900/20 ${
@@ -363,7 +378,7 @@ export default function SessionManagerTab() {
 
 // ── Sub-components ──────────────────────────────────────────
 
-function StatusCount({ label, count, color }) {
+function StatusCount({ label, count, color }: { label: string; count: number; color: string }) {
   return (
     <span className="flex items-center gap-1.5" style={{ color: count > 0 ? color : '#3f3f46' }}>
       <span
@@ -375,7 +390,7 @@ function StatusCount({ label, count, color }) {
   );
 }
 
-function TabBtn({ active, onClick, children, warn }) {
+function TabBtn({ active, onClick, children, warn }: { active: boolean; onClick: () => void; children: React.ReactNode; warn?: boolean }) {
   return (
     <button
       onClick={onClick}

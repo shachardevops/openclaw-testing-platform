@@ -174,19 +174,12 @@ function DecisionRow({ entry }: { entry: HistoryEntry }) {
 }
 
 export default function DirectAITab() {
-  const { providers, stats, history, loading, error, refresh } = useDirectAI(true, 5000) as {
-    providers: Providers;
-    stats: AIStats | null;
-    history: HistoryEntry[];
-    loading: boolean;
-    error: string | null;
-    refresh: () => void;
-  };
+  const { providers, stats, history, loading, error, refresh } = useDirectAI(true, 5000) as any;
   const [filter, setFilter] = useState('all');
 
   const filteredHistory = useMemo(() => {
     if (filter === 'all') return history;
-    return history.filter(h => h.type === filter || h.provider === filter);
+    return history.filter((h: any) => h.type === filter || h.provider === filter);
   }, [history, filter]);
 
   const filterCounts = useMemo(() => {
@@ -290,7 +283,7 @@ export default function DirectAITab() {
             </span>
           </div>
         )}
-        {filteredHistory.map((entry, i) => (
+        {filteredHistory.map((entry: any, i: number) => (
           <DecisionRow key={`${entry.timestamp}-${i}`} entry={entry} />
         ))}
       </div>

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     if (!taskId) return Response.json({ ok: false, error: 'taskId required' }, { status: 400 });
     const status = getRecordingStatus(taskId);
     if (!status) return Response.json({ ok: true, recording: false });
-    return Response.json({ ok: true, recording: true, ...status });
+    return Response.json({ ok: true, ...status, recording: true });
   }
 
   if (action === 'exists') {
@@ -106,12 +106,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === 'event') {
-    addRecordingEvent(taskId, body.type, body.data);
+    if (!taskId) return Response.json({ ok: false, error: 'taskId required' }, { status: 400 });
+    addRecordingEvent(taskId!, body.type as string, body.data as Record<string, unknown>);
     return Response.json({ ok: true });
   }
 
   if (action === 'sync-findings') {
-    syncRecordingFindings(taskId);
+    if (!taskId) return Response.json({ ok: false, error: 'taskId required' }, { status: 400 });
+    syncRecordingFindings(taskId!);
     return Response.json({ ok: true });
   }
 

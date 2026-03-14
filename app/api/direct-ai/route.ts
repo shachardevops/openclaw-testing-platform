@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       temperature,
     };
 
-    let result: Record<string, unknown> | null = null;
+    let result: any = null;
 
     if (provider === 'claude') {
       result = await askClaude(prompt, opts);

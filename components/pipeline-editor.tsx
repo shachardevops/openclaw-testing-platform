@@ -50,7 +50,7 @@ export default function PipelineEditor({ pipeline, onClose }: PipelineEditorProp
           {TASKS.map(t => (
             <label key={t.id} className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-card-hover text-xs">
               <input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} className="accent-accent" />
-              <span>{(t as Record<string, unknown>).icon as string}</span>
+              <span>{(t as any).icon as string}</span>
               <span className="text-zinc-300">S{t.num}: {t.title}</span>
             </label>
           ))}

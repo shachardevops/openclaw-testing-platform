@@ -165,6 +165,8 @@ interface ActionLogEntry {
   taskId: string | null;
   result: string;
   ts: number;
+  target?: string;
+  reason?: string;
 }
 
 interface DebugLogEntry {

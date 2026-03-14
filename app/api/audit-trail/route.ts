@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10);
 
     if (category || taskId) {
-      const events = auditTrail.query({ category, taskId, limit });
+      const events = (auditTrail as any).query({ category, taskId, limit });
       return Response.json({ ok: true, events });
     }
 

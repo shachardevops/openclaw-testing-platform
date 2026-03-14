@@ -1,11 +1,22 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useDashboard } from '@/context/dashboard-context';
+
+interface Session {
+  sessionId?: string;
+  id?: string;
+  isController?: boolean;
+  key?: string;
+  name?: string;
+  model?: string;
+  ageMinutes?: number;
+  kind?: string;
+}
 
 export default function SessionBrowser() {
   const { gatewayStatus, addLog } = useDashboard();
-  const [sessions, setSessions] = useState<Record<string, unknown>[]>([]);
+  const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(false);
   const [collapsed, setCollapsed] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -19,7 +30,9 @@ export default function SessionBrowser() {
       const res = await fetch('/api/sessions');
       const data = await res.json();
       if (data.ok) setSessions(data.sessions || []);
-    } catch (e: unknown) { /* ignore */ }
+    } catch (e: unknown) {
+      // ignore
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -99,7 +112,7 @@ export default function SessionBrowser() {
               </div>
             )}
             {filtered.map(s => {
-              const sid = (s.sessionId as string) || (s.id as string);
+              const sid = s.sessionId || s.id || '';
               const isExpanded = expandedId === sid;
               return (
                 <div key={sid} className="border-b border-border last:border-0">
@@ -110,10 +123,10 @@ export default function SessionBrowser() {
                     <span className="text-sm">{s.isController ? '\ud83c\udfae' : '\ud83e\udd16'}</span>
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-medium text-zinc-200 truncate">
-                        {(s.key as string) || (s.name as string) || sid.slice(0, 16)}
+                        {s.key || s.name || sid.slice(0, 16)}
                       </div>
                       <div className="text-[10px] text-zinc-500 font-mono">
-                        {sid.slice(0, 12)}... {s.model ? `\u00b7 ${s.model}` : ''} {s.ageMinutes != null ? `\u00b7 ${formatAge(s.ageMinutes as number)} ago` : ''}
+                        {sid.slice(0, 12)}... {s.model ? `\u00b7 ${s.model}` : ''} {s.ageMinutes != null ? `\u00b7 ${formatAge(s.ageMinutes)} ago` : ''}
                       </div>
                     </div>
                     <span className="text-[10px] text-zinc-600">{isExpanded ? '\u25be' : '\u25b8'}</span>
@@ -122,16 +135,16 @@ export default function SessionBrowser() {
                     <div className="px-5 pb-3">
                       <div className="text-[10px] text-zinc-500 font-mono mb-2 space-y-0.5">
                         <div>Session: {sid}</div>
-                        {s.key && <div>Key: {s.key as string}</div>}
-                        {s.model && <div>Model: {s.model as string}</div>}
-                        {s.kind && <div>Kind: {s.kind as string}</div>}
+                        {s.key && <div>Key: {s.key}</div>}
+                        {s.model && <div>Model: {s.model}</div>}
+                        {s.kind && <div>Kind: {s.kind}</div>}
                       </div>
                       {gatewayStatus === 'connected' && (
                         <div className="flex gap-2">
                           <input
                             value={messageInput}
-                            onChange={(e) => setMessageInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && !sending && sendMessage(sid)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMessageInput(e.target.value)}
+                            onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && !sending && sendMessage(sid)}
                             placeholder="Send message..."
                             className="flex-1 bg-[#0a0a12] border border-border rounded-lg px-2.5 py-1.5 text-xs text-zinc-200 font-mono"
                           />

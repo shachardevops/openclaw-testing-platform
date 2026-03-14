@@ -101,7 +101,7 @@ const nodeTypes = { knowledgeNode: KnowledgeNode };
 // ─── Filter Bar ──────────────────────────────────────────────────────────────
 
 interface FilterBarProps {
-  filters: Record<string, boolean>;
+  filters: any;
   toggleFilter: (key: string) => void;
   nodeCount: number;
   edgeCount: number;
@@ -145,7 +145,7 @@ function FilterBar({ filters, toggleFilter, nodeCount, edgeCount }: FilterBarPro
 // ─── Detail Sidebar ──────────────────────────────────────────────────────────
 
 interface DetailSidebarProps {
-  node: Node<KnowledgeNodeData> | null;
+  node: any;
   onClose: () => void;
 }
 
@@ -330,12 +330,12 @@ export default function KnowledgeGraphTab() {
     setSelectedNode,
   } = useKnowledgeGraph(true);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes as any);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges as any);
 
   // Sync when data updates
-  const nodesKey = useMemo(() => initialNodes.map((n: Node) => n.id).sort().join(','), [initialNodes]);
-  const edgesKey = useMemo(() => initialEdges.map((e: Edge) => e.id).sort().join(','), [initialEdges]);
+  const nodesKey = useMemo(() => initialNodes.map((n: any) => n.id).sort().join(','), [initialNodes]);
+  const edgesKey = useMemo(() => initialEdges.map((e: any) => e.id).sort().join(','), [initialEdges]);
 
   // Update nodes/edges when the source data changes
   const prevNodesKeyRef = useMemo(() => ({ current: '' }), []);
@@ -344,15 +344,15 @@ export default function KnowledgeGraphTab() {
   if (nodesKey !== prevNodesKeyRef.current) {
     prevNodesKeyRef.current = nodesKey;
     if (nodes.length === 0 || nodes.map(n => n.id).sort().join(',') !== nodesKey) {
-      setNodes(initialNodes);
+      setNodes(initialNodes as any);
     }
   }
   if (edgesKey !== prevEdgesKeyRef.current) {
     prevEdgesKeyRef.current = edgesKey;
-    setEdges(initialEdges);
+    setEdges(initialEdges as any);
   }
 
-  const handleNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
+  const handleNodeClick = useCallback((_event: React.MouseEvent, node: any) => {
     onNodeClick(_event, node);
   }, [onNodeClick]);
 
@@ -381,7 +381,7 @@ export default function KnowledgeGraphTab() {
     <div className="flex-1 flex flex-col min-h-0">
       <FilterBar
         filters={filters}
-        toggleFilter={toggleFilter}
+        toggleFilter={toggleFilter as any}
         nodeCount={nodes.length}
         edgeCount={edges.length}
       />
@@ -411,8 +411,8 @@ export default function KnowledgeGraphTab() {
               className="!bg-zinc-900 !border-zinc-700 !shadow-xl [&>button]:!bg-zinc-800 [&>button]:!border-zinc-700 [&>button]:!text-zinc-400 [&>button:hover]:!bg-zinc-700"
             />
             <MiniMap
-              nodeStrokeColor={(n) => n.data?.color || '#666'}
-              nodeColor={(n) => `${n.data?.color || '#666'}40`}
+              nodeStrokeColor={(n: any) => n.data?.color || '#666'}
+              nodeColor={(n: any) => `${n.data?.color || '#666'}40`}
               maskColor="#09090b80"
               className="!bg-zinc-900 !border-zinc-700"
             />

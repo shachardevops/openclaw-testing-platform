@@ -43,7 +43,7 @@ export default function SkillPicker({ attachedIds = [], onToggle }: SkillPickerP
                 onChange={() => onToggle(skill.id)}
                 className="mt-0.5 accent-accent"
               />
-              <span className="pt-0.5">{(skill as Record<string, unknown>).icon as string}</span>
+              <span className="pt-0.5">{(skill as any).icon as string}</span>
               <span className="min-w-0">
                 <span className="block text-zinc-300">{skill.name}</span>
                 {skill.description && (

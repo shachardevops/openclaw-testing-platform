@@ -209,7 +209,7 @@ export default function OrchestratorTab() {
             Pending Review ({pendingReview.length})
           </div>
           <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
-            {pendingReview.map((rec: Recommendation) => (
+            {pendingReview.map((rec: any) => (
               <div key={rec.id} className="flex items-center gap-2 font-mono text-[10px]">
                 <span className="text-purple-400 shrink-0">{rec.action}</span>
                 <span className="text-zinc-400 truncate flex-1" title={rec.description}>
@@ -257,7 +257,7 @@ export default function OrchestratorTab() {
               No active sessions — tree is empty
             </div>
           ) : (
-            <DecisionTreeView nodes={decisionTree.nodes} thresholds={decisionTree.thresholds} />
+            <DecisionTreeView nodes={decisionTree.nodes as any} thresholds={decisionTree.thresholds} />
           )}
         </div>
       )}
@@ -270,7 +270,7 @@ export default function OrchestratorTab() {
               No decisions yet — engine is monitoring...
             </div>
           ) : (
-            recentDecisions.map((d: Decision, i: number) => {
+            recentDecisions.map((d: any, i: number) => {
               const key = `${d.ts}-${i}`;
               const isExpanded = expandedDecisions.has(key);
               const hasMessage = !!d.message;
@@ -330,7 +330,7 @@ export default function OrchestratorTab() {
                 <span>Age</span>
                 <span>Action Taken</span>
               </div>
-              {activeConditions.map((c: Condition, i: number) => (
+              {activeConditions.map((c: any, i: number) => (
                 <div key={`${c.type}-${c.id}-${i}`} className="grid grid-cols-[100px_120px_80px_80px_1fr] gap-1 px-3 py-1.5 border-b border-zinc-900/30 items-center hover:bg-zinc-800/20">
                   <span className="text-amber-400 uppercase">{c.type}</span>
                   <span className="text-zinc-300 truncate" title={c.id}>{c.id?.slice(0, 16)}</span>

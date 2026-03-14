@@ -78,7 +78,7 @@ export interface DashboardContextValue extends DashboardState {
   runTask: (taskId: string) => Promise<void>;
   cancelTask: (taskId: string) => Promise<void>;
   runPipeline: (pipelineId: string) => void;
-  runInlinePipeline: (taskIds: string[]) => void;
+  runInlinePipeline: (name: string, taskIds: string[]) => void;
   stopPipeline: () => void;
   createPipeline: (name: string, taskIds: string[]) => string;
   updatePipeline: (id: string, updates: Partial<CustomPipeline>) => void;

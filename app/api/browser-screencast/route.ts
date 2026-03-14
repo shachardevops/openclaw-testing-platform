@@ -60,7 +60,7 @@ function resolveManagedTaskTarget(taskId: string) {
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const mode = url.searchParams.get('mode') || 'stream';
-  const cdpPort = parseInt(url.searchParams.get('cdpPort') || DEFAULT_CDP_PORT, 10);
+  const cdpPort = parseInt(url.searchParams.get('cdpPort') || String(DEFAULT_CDP_PORT), 10);
   const taskId = url.searchParams.get('taskId');
 
   // ── Targets list ────────────────────────────────────────────
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
   const everyNthFrame = Math.max(1, Math.round(15 / fps)); // Chrome sends ~15fps max
   const targetId = url.searchParams.get('targetId');
 
-  let target: Record<string, unknown> | undefined;
+  let target: any;
   try {
     if (taskId) {
       const managed = resolveManagedTaskTarget(taskId);

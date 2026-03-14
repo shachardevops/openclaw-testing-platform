@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { getProjectConfig } from './project-loader';
 import { parseFindingsFromReport } from './report-parser';
-import vectorMemory from './vector-memory.js';
+import vectorMemory from './vector-memory';
 
 const DEFAULT_CONFIG = {
   enabled: false,
