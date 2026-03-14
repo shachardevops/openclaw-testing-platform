@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "OpenClaw RuVector DB",
+      "Group": "OpenClaw",
+      "Host": "ruvector-db",
+      "Port": 5432,
+      "MaintenanceDB": "openclaw_vectors",
+      "Username": "ruvector",
+      "SSLMode": "prefer",
+      "Comment": "RuVector PostgreSQL — vector database for QA learnings, decisions, and patterns"
+    }
+  }
+}

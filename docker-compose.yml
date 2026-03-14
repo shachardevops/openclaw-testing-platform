@@ -1,0 +1,104 @@
+version: "3.8"
+
+# ============================================================================
+# OpenClaw Testing Platform — Docker Compose
+# ============================================================================
+# Services:
+#   ruvector-db    — RuVector PostgreSQL (vector DB with HNSW+GNN indexing)
+#   ruvector-ui    — pgAdmin web UI for managing the vector database
+#   openclaw-app   — Next.js QA dashboard (optional, can also run natively)
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # RuVector PostgreSQL — Vector Database
+  # --------------------------------------------------------------------------
+  # Extends PostgreSQL with 65+ vector/graph/GNN functions.
+  # Drop-in pgvector replacement with SIMD acceleration.
+  # https://hub.docker.com/r/ruvnet/ruvector-postgres
+  # --------------------------------------------------------------------------
+  ruvector-db:
+    image: ruvnet/ruvector-postgres:latest
+    container_name: openclaw-ruvector-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${RUVECTOR_DB_USER:-ruvector}
+      POSTGRES_PASSWORD: ${RUVECTOR_DB_PASSWORD:-ruvector_secret}
+      POSTGRES_DB: ${RUVECTOR_DB_NAME:-openclaw_vectors}
+    ports:
+      - "${RUVECTOR_DB_PORT:-5433}:5432"
+    volumes:
+      - ruvector-data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${RUVECTOR_DB_USER:-ruvector} -d ${RUVECTOR_DB_NAME:-openclaw_vectors}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - openclaw-net
+
+  # --------------------------------------------------------------------------
+  # pgAdmin — Web UI for RuVector/PostgreSQL Management
+  # --------------------------------------------------------------------------
+  # Browse tables, run SQL queries, inspect vector collections, view indexes.
+  # Access at http://localhost:5050
+  # --------------------------------------------------------------------------
+  ruvector-ui:
+    image: dpage/pgadmin4:latest
+    container_name: openclaw-ruvector-ui
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@openclaw.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_LISTEN_PORT: 5050
+    ports:
+      - "${PGADMIN_PORT:-5050}:5050"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+      - ./docker/pgadmin-servers.json:/pgadmin4/servers.json:ro
+    depends_on:
+      ruvector-db:
+        condition: service_healthy
+    networks:
+      - openclaw-net
+
+  # --------------------------------------------------------------------------
+  # RuVector Standalone — Full RuVector Server (HNSW + GNN + SONA)
+  # --------------------------------------------------------------------------
+  # Native RuVector server for Node.js NAPI-RS clients.
+  # The app's lib/vector-memory.js can connect to this instead of in-process.
+  # https://hub.docker.com/r/ruvnet/ruvector
+  # --------------------------------------------------------------------------
+  ruvector-server:
+    image: ruvnet/ruvector:latest
+    container_name: openclaw-ruvector-server
+    restart: unless-stopped
+    environment:
+      RUVECTOR_DIMENSIONS: ${RUVECTOR_DIMENSIONS:-384}
+      RUVECTOR_PORT: 8080
+    ports:
+      - "${RUVECTOR_SERVER_PORT:-8080}:8080"
+    volumes:
+      - ruvector-index-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - openclaw-net
+
+volumes:
+  ruvector-data:
+    driver: local
+  ruvector-index-data:
+    driver: local
+  pgadmin-data:
+    driver: local
+
+networks:
+  openclaw-net:
+    driver: bridge
