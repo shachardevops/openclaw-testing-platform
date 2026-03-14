@@ -233,7 +233,10 @@ export async function GET() {
         try { stopRecording(recording.taskId); } catch {}
       }
     }
-  } catch {}
+  } catch (e) {
+    console.error('[results/route] Error loading results:', e.message);
+    return Response.json({ ok: false, error: e.message, code: 'RESULTS_LOAD_ERROR' }, { status: 500 });
+  }
 
   return Response.json(results);
 }

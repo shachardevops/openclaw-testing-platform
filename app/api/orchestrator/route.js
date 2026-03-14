@@ -86,6 +86,20 @@ export async function POST(request) {
         }
         break;
 
+      case 'revert-recommendation':
+        if (!data.patternKey) {
+          result = { ok: false, error: 'Missing patternKey' };
+        } else {
+          // Revert a learned recommendation from decision memory
+          if (orchestratorEngine._decisionMemory) {
+            orchestratorEngine._decisionMemory.store(data.patternKey, 'ignore', 'Reverted by operator');
+            result = { ok: true, reverted: data.patternKey };
+          } else {
+            result = { ok: false, error: 'Decision memory not initialized' };
+          }
+        }
+        break;
+
       default:
         result = { ok: false, error: `Unknown action: ${action}` };
     }

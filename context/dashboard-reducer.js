@@ -89,6 +89,36 @@ export function dashboardReducer(state, a) {
     case 'SET_SESSIONS':
       return { ...state, sessions: a.sessions };
 
+    // Ruflo: Swarm
+    case 'SET_SWARM_STATUS':
+      return { ...state, swarmStatus: a.data };
+    case 'SET_WORKER_STATUS':
+      return { ...state, workerStatus: a.data };
+
+    // Ruflo: Consensus
+    case 'SET_CONSENSUS_STATUS':
+      return { ...state, consensusStatus: a.data };
+
+    // Ruflo: RL/SONA
+    case 'SET_RL_RECOMMENDATION':
+      return { ...state, rlRecommendation: a.data };
+    case 'SET_SONA_STATE':
+      return { ...state, sonaState: a.data };
+
+    // Ruflo: Anti-Drift
+    case 'SET_DRIFT_ALERT':
+      return { ...state, driftAlerts: a.data };
+    case 'SET_CHECKPOINTS':
+      return { ...state, checkpoints: a.data };
+
+    // Ruflo: Search
+    case 'SET_SEARCH_RESULTS':
+      return { ...state, searchResults: a.data };
+
+    // Ruflo: Booster
+    case 'SET_BOOSTER_STATS':
+      return { ...state, boosterStats: a.data };
+
     default:
       return state;
   }

@@ -1,0 +1,39 @@
+services:
+  # ── RuVector PostgreSQL (vector database) ──────────────────────────────────
+  # Image: ruvnet/ruvector-postgres (from https://github.com/ruvnet/RuVector)
+  # Default creds: ruvector/ruvector, database: ruvector_test
+  ruvector:
+    image: ruvnet/ruvector-postgres:latest
+    platform: linux/amd64
+    container_name: ruvector
+    ports:
+      - "${RUVECTOR_PORT:-5433}:5432"
+    environment:
+      POSTGRES_USER: ruvector
+      POSTGRES_PASSWORD: ruvector
+      POSTGRES_DB: ruvector_test
+    volumes:
+      - ruvector-data:/var/lib/postgresql/data
+      - ./scripts/init-ruvector.sql:/docker-entrypoint-initdb.d/init-ruvector.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ruvector -d ruvector_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # ── RuVector Edge-Net Dashboard (vector DB frontend) ───────────────────────
+  edge-net:
+    build:
+      context: ./RuVector/examples/edge-net/dashboard
+      dockerfile: Dockerfile
+    container_name: ruvector-edge-net
+    ports:
+      - "${EDGE_NET_PORT:-5173}:80"
+    depends_on:
+      ruvector:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ruvector-data:

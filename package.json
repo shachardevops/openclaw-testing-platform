@@ -6,13 +6,16 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "index-memory": "node scripts/index-memory.mjs",
+    "run": "bash scripts/run.sh"
   },
   "dependencies": {
     "next": "^15.3.3",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
+    "ruvector": "^0.2.12",
     "ws": "^8.19.0"
   },
   "devDependencies": {

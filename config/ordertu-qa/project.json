@@ -27,7 +27,18 @@
     "recoveryCooldownMs": 120000,
     "maxControllerMessagesPerMinute": 6,
     "aiConsultationEnabled": true,
-    "decisionMemoryFile": "memory/decision-memory.json"
+    "decisionMemoryFile": "memory/decision-memory.json",
+    "confidenceThreshold": 0.6
+  },
+  "pipeline": {
+    "stallTimeoutMs": 600000,
+    "maxDurationMs": 7200000,
+    "requireMinPassCount": 1
+  },
+  "antiDrift": {
+    "enabled": true,
+    "maxRepetitions": 3,
+    "checkpointTimeoutMs": 600000
   },
   "modelFallback": {
     "enabled": true,

@@ -1,0 +1,280 @@
+{
+  "version": "1.0.0",
+  "description": "Agent registry for OpenClaw QA Dashboard - OrderTu project",
+  "domains": {
+    "qa": {
+      "description": "QA testing and analysis agents",
+      "agents": {
+        "qa-bug-analyst": {
+          "file": "qa-bug-analyst.md",
+          "specialty": "Analyzes bug reports and patterns across QA runs"
+        },
+        "regression-tracker": {
+          "file": "regression-tracker.md",
+          "specialty": "Tracks regression patterns across QA runs"
+        },
+        "test-coverage-analyzer": {
+          "file": "test-coverage-analyzer.md",
+          "specialty": "Analyzes test coverage gaps in QA scenarios"
+        },
+        "exploratory-tester": {
+          "file": "exploratory-tester.md",
+          "specialty": "Designs exploratory test scenarios for uncovered areas"
+        },
+        "security-reviewer": {
+          "file": "security-reviewer.md",
+          "specialty": "Reviews security vulnerabilities in the application and dashboard"
+        },
+        "i18n-specialist": {
+          "file": "i18n-specialist.md",
+          "specialty": "Reviews internationalization and localization issues"
+        },
+        "responsive-specialist": {
+          "file": "responsive-specialist.md",
+          "specialty": "Reviews responsive design and cross-device issues"
+        },
+        "accessibility-auditor": {
+          "file": "accessibility-auditor.md",
+          "specialty": "Audits accessibility compliance (WCAG)"
+        },
+        "performance-tester": {
+          "file": "performance-tester.md",
+          "specialty": "Tests performance, load capacity, and response times"
+        },
+        "data-integrity-checker": {
+          "file": "data-integrity-checker.md",
+          "specialty": "Verifies data consistency across results and reports"
+        },
+        "edge-case-finder": {
+          "file": "edge-case-finder.md",
+          "specialty": "Finds edge cases in test scenarios and application logic"
+        },
+        "smoke-test-runner": {
+          "file": "smoke-test-runner.md",
+          "specialty": "Designs and validates smoke test suites"
+        },
+        "visual-diff-analyzer": {
+          "file": "visual-diff-analyzer.md",
+          "specialty": "Analyzes visual differences and UI regressions"
+        },
+        "api-contract-tester": {
+          "file": "api-contract-tester.md",
+          "specialty": "Tests API contracts and validates response schemas"
+        },
+        "error-boundary-tester": {
+          "file": "error-boundary-tester.md",
+          "specialty": "Tests error handling boundaries and failure modes"
+        }
+      }
+    },
+    "development": {
+      "description": "Development and code quality agents",
+      "agents": {
+        "nextjs-expert": {
+          "file": "nextjs-expert.md",
+          "specialty": "Next.js 15 App Router expert"
+        },
+        "business-logic": {
+          "file": "business-logic.md",
+          "specialty": "Business logic and domain modeling"
+        },
+        "component-builder": {
+          "file": "component-builder.md",
+          "specialty": "Builds React components for the QA dashboard"
+        },
+        "api-route-builder": {
+          "file": "api-route-builder.md",
+          "specialty": "Builds Next.js API routes for the dashboard"
+        },
+        "state-management-expert": {
+          "file": "state-management-expert.md",
+          "specialty": "Expert on React state patterns and context architecture"
+        },
+        "tailwind-styler": {
+          "file": "tailwind-styler.md",
+          "specialty": "Expert on Tailwind CSS 4 styling and design system"
+        },
+        "type-system-enforcer": {
+          "file": "type-system-enforcer.md",
+          "specialty": "TypeScript type enforcement and safety"
+        },
+        "error-handler": {
+          "file": "error-handler.md",
+          "specialty": "Designs and implements error handling patterns"
+        },
+        "migration-planner": {
+          "file": "migration-planner.md",
+          "specialty": "Plans data and code migrations safely"
+        },
+        "dependency-updater": {
+          "file": "dependency-updater.md",
+          "specialty": "Manages dependency updates and compatibility"
+        },
+        "build-optimizer": {
+          "file": "build-optimizer.md",
+          "specialty": "Optimizes build performance and bundle size"
+        },
+        "test-writer": {
+          "file": "test-writer.md",
+          "specialty": "Writes unit and integration tests"
+        },
+        "documentation-writer": {
+          "file": "documentation-writer.md",
+          "specialty": "Writes technical documentation and guides"
+        },
+        "code-reviewer": {
+          "file": "code-reviewer.md",
+          "specialty": "Reviews code quality and best practices"
+        },
+        "refactoring-specialist": {
+          "file": "refactoring-specialist.md",
+          "specialty": "Refactors code for improved quality and maintainability"
+        }
+      }
+    },
+    "operations": {
+      "description": "Operations, infrastructure, and reliability agents",
+      "agents": {
+        "orchestration-performance": {
+          "file": "orchestration-performance.md",
+          "specialty": "Orchestrator performance optimization"
+        },
+        "openclaw-docs": {
+          "file": "openclaw-docs.md",
+          "specialty": "OpenClaw documentation and integration"
+        },
+        "pipeline-debugger": {
+          "file": "pipeline-debugger.md",
+          "specialty": "Debugs pipeline execution issues and failures"
+        },
+        "session-doctor": {
+          "file": "session-doctor.md",
+          "specialty": "Diagnoses and resolves session problems"
+        },
+        "config-validator-agent": {
+          "file": "config-validator-agent.md",
+          "specialty": "Validates configuration files and consistency"
+        },
+        "log-analyzer": {
+          "file": "log-analyzer.md",
+          "specialty": "Analyzes log files for issues and patterns"
+        },
+        "deployment-manager": {
+          "file": "deployment-manager.md",
+          "specialty": "Manages deployment processes and verification"
+        },
+        "monitoring-setup": {
+          "file": "monitoring-setup.md",
+          "specialty": "Sets up monitoring and observability"
+        },
+        "alert-tuner": {
+          "file": "alert-tuner.md",
+          "specialty": "Tunes alert thresholds to reduce noise"
+        },
+        "capacity-planner": {
+          "file": "capacity-planner.md",
+          "specialty": "Plans capacity for concurrent agent sessions"
+        },
+        "resource-optimizer": {
+          "file": "resource-optimizer.md",
+          "specialty": "Optimizes resource usage and efficiency"
+        },
+        "backup-strategist": {
+          "file": "backup-strategist.md",
+          "specialty": "Plans backup and recovery strategies"
+        },
+        "rollback-planner": {
+          "file": "rollback-planner.md",
+          "specialty": "Plans rollback procedures for failed changes"
+        },
+        "incident-responder": {
+          "file": "incident-responder.md",
+          "specialty": "Responds to production incidents with triage and resolution"
+        },
+        "health-check-builder": {
+          "file": "health-check-builder.md",
+          "specialty": "Builds comprehensive health check endpoints"
+        }
+      }
+    },
+    "intelligence": {
+      "description": "Data analysis, AI optimization, and knowledge management agents",
+      "agents": {
+        "claude-agent-architect": {
+          "file": "claude-agent-architect.md",
+          "specialty": "Claude agent architecture and design"
+        },
+        "performance-patterns-reviewer": {
+          "file": "performance-patterns-reviewer.md",
+          "specialty": "Reviews performance patterns"
+        },
+        "systems-architecture-reviewer": {
+          "file": "systems-architecture-reviewer.md",
+          "specialty": "Reviews systems architecture"
+        },
+        "memory-curator": {
+          "file": "memory-curator.md",
+          "specialty": "Curates and organizes agent memory and learnings"
+        },
+        "report-generator": {
+          "file": "report-generator.md",
+          "specialty": "Generates comprehensive QA reports and summaries"
+        },
+        "story-writer": {
+          "file": "story-writer.md",
+          "specialty": "Writes QA test stories with structured test cases"
+        },
+        "model-performance-analyst": {
+          "file": "model-performance-analyst.md",
+          "specialty": "Analyzes AI model performance across QA tasks"
+        },
+        "dependency-mapper": {
+          "file": "dependency-mapper.md",
+          "specialty": "Maps code and system dependencies"
+        },
+        "pattern-recognizer": {
+          "file": "pattern-recognizer.md",
+          "specialty": "Recognizes patterns in QA data and system behavior"
+        },
+        "anomaly-detector": {
+          "file": "anomaly-detector.md",
+          "specialty": "Detects anomalies in QA results and system metrics"
+        },
+        "cost-optimizer": {
+          "file": "cost-optimizer.md",
+          "specialty": "Optimizes operational costs for QA runs"
+        },
+        "token-budget-planner": {
+          "file": "token-budget-planner.md",
+          "specialty": "Plans and manages token budgets for AI operations"
+        },
+        "context-compressor-agent": {
+          "file": "context-compressor-agent.md",
+          "specialty": "Compresses context for efficient AI agent operations"
+        },
+        "embedding-specialist": {
+          "file": "embedding-specialist.md",
+          "specialty": "Works with embeddings for semantic search and matching"
+        },
+        "knowledge-graph-builder": {
+          "file": "knowledge-graph-builder.md",
+          "specialty": "Builds knowledge graphs of system relationships"
+        },
+        "decision-memory-analyst": {
+          "file": "decision-memory-analyst.md",
+          "specialty": "Analyzes orchestrator decision patterns and memory"
+        },
+        "trend-analyzer": {
+          "file": "trend-analyzer.md",
+          "specialty": "Analyzes trends in QA metrics over time"
+        },
+        "recommendation-engine": {
+          "file": "recommendation-engine.md",
+          "specialty": "Generates actionable recommendations from QA data"
+        }
+      }
+    }
+  },
+  "totalAgents": 63,
+  "agentDirectory": ".claude/agents/"
+}
