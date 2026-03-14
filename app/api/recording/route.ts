@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
   if (!taskId) return Response.json({ ok: false, error: 'taskId required' }, { status: 400 });
 
   if (action === 'start') {
-    const result = await startRecording(taskId, body.opts);
+    const result = await startRecording(taskId, body.opts as Record<string, unknown> | undefined);
     return Response.json(result, { status: result.ok ? 200 : 500 });
   }
 

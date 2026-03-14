@@ -1,3 +1,4 @@
+import { NextRequest } from 'next/server';
 import vectorMemory from '@/lib/vector-memory';
 
 export const runtime = 'nodejs';
@@ -11,8 +12,8 @@ export async function GET() {
   try {
     const status = vectorMemory.getStatus();
     return Response.json({ ok: true, ...status });
-  } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+  } catch (e: unknown) {
+    return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }
 }
 
@@ -25,9 +26,9 @@ export async function GET() {
  *   - find-decisions: find similar past orchestrator decisions
  *   - find-learnings: find relevant learnings for a task
  */
-export async function POST(request) {
+export async function POST(request: NextRequest) {
   try {
-    const data = await request.json();
+    const data = await request.json() as { action: string; query?: string; collection?: string; limit?: number; id?: string; text?: string; metadata?: Record<string, unknown> };
     const { action } = data;
 
     switch (action) {
@@ -113,7 +114,7 @@ export async function POST(request) {
       default:
         return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
     }
-  } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+  } catch (e: unknown) {
+    return Response.json({ ok: false, error: (e as Error).message }, { status: 400 });
   }
 }

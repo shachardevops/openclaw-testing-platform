@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react';
 import { useSwarm } from '@/hooks/use-swarm';
 
 // Mirrored from lib/orchestrator-engine.js — cannot import server module in client component
-const AUTONOMY_LEVELS = {
+const AUTONOMY_LEVELS: Record<number, { name: string }> = {
   0: { name: 'manual' },
   1: { name: 'supervised' },
   2: { name: 'autonomous' },
@@ -14,7 +14,7 @@ const AUTONOMY_LEVELS = {
 
 // ─── Status helpers ──────────────────────────────────────────────────────────
 
-const STATUS_COLORS = {
+const STATUS_COLORS: Record<string, string> = {
   running: 'bg-green-500',
   idle: 'bg-zinc-500',
   stale: 'bg-yellow-500',
@@ -24,13 +24,13 @@ const STATUS_COLORS = {
   unknown: 'bg-zinc-600',
 };
 
-function statusDot(status) {
+function statusDot(status: string) {
   const color = STATUS_COLORS[status] || STATUS_COLORS.unknown;
   const pulse = status === 'running' ? 'animate-pulse' : '';
   return <span className={`inline-block h-2 w-2 rounded-full ${color} ${pulse}`} />;
 }
 
-function timeAgo(iso) {
+function timeAgo(iso: string | undefined) {
   if (!iso) return '—';
   const ms = Date.now() - new Date(iso).getTime();
   if (ms < 60000) return `${Math.round(ms / 1000)}s ago`;
@@ -40,10 +40,16 @@ function timeAgo(iso) {
 
 // ─── Agent Card ──────────────────────────────────────────────────────────────
 
-function AgentCard({ agent, selected, onSelect }) {
+interface AgentCardProps {
+  agent: Record<string, unknown>;
+  selected: boolean;
+  onSelect: (id: string) => void;
+}
+
+function AgentCard({ agent, selected, onSelect }: AgentCardProps) {
   return (
     <button
-      onClick={() => onSelect(agent.id)}
+      onClick={() => onSelect(agent.id as string)}
       className={`w-full text-left rounded-lg border p-3 transition-all ${
         selected
           ? 'border-accent bg-accent/10'
@@ -52,19 +58,19 @@ function AgentCard({ agent, selected, onSelect }) {
     >
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
-          {statusDot(agent.status)}
+          {statusDot(agent.status as string)}
           <span className="text-xs font-medium text-zinc-100 truncate max-w-[140px]">
-            {agent.taskId || agent.sessionId || agent.id}
+            {(agent.taskId as string) || (agent.sessionId as string) || (agent.id as string)}
           </span>
         </div>
-        <span className="text-[10px] font-mono text-zinc-500">{agent.model || '—'}</span>
+        <span className="text-[10px] font-mono text-zinc-500">{(agent.model as string) || '—'}</span>
       </div>
       <div className="flex items-center justify-between text-[10px] text-zinc-500">
-        <span>{agent.status}</span>
-        <span>{timeAgo(agent.lastActivity)}</span>
+        <span>{agent.status as string}</span>
+        <span>{timeAgo(agent.lastActivity as string | undefined)}</span>
       </div>
       {agent.lastLog && (
-        <div className="mt-1 text-[10px] text-zinc-500 truncate">{agent.lastLog}</div>
+        <div className="mt-1 text-[10px] text-zinc-500 truncate">{agent.lastLog as string}</div>
       )}
     </button>
   );
@@ -72,7 +78,15 @@ function AgentCard({ agent, selected, onSelect }) {
 
 // ─── Agent Detail Panel ──────────────────────────────────────────────────────
 
-function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
+interface AgentDetailPanelProps {
+  agent: Record<string, unknown> | undefined;
+  detail: Record<string, unknown> | null;
+  onNudge: (sessionId: string) => void;
+  onSwap: (sessionId: string) => void;
+  onKill: (sessionId: string) => void;
+}
+
+function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }: AgentDetailPanelProps) {
   const [subTab, setSubTab] = useState('thinking');
 
   if (!agent) {
@@ -83,9 +97,9 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
     );
   }
 
-  const thinking = detail?.thinkingHistory || detail?.recentLogs || [];
-  const routing = detail?.routingDecisions || [];
-  const timeline = detail?.timeline || [];
+  const thinking = (detail?.thinkingHistory as Record<string, unknown>[]) || (detail?.recentLogs as Record<string, unknown>[]) || [];
+  const routing = (detail?.routingDecisions as Record<string, unknown>[]) || [];
+  const timeline = (detail?.timeline as Record<string, unknown>[]) || [];
 
   return (
     <div className="flex-1 flex flex-col min-h-0 border-l border-border">
@@ -93,28 +107,28 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
       <div className="p-3 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {statusDot(agent.status)}
+            {statusDot(agent.status as string)}
             <span className="text-sm font-medium text-zinc-100">
-              {agent.taskId || agent.id}
+              {(agent.taskId as string) || (agent.id as string)}
             </span>
           </div>
           <div className="flex gap-1">
             {agent.status === 'running' && (
               <>
                 <button
-                  onClick={() => onNudge(agent.sessionId)}
+                  onClick={() => onNudge(agent.sessionId as string)}
                   className="px-2 py-0.5 text-[10px] rounded bg-yellow-900/40 text-yellow-400 hover:bg-yellow-900/60"
                 >
                   Nudge
                 </button>
                 <button
-                  onClick={() => onSwap(agent.sessionId)}
+                  onClick={() => onSwap(agent.sessionId as string)}
                   className="px-2 py-0.5 text-[10px] rounded bg-blue-900/40 text-blue-400 hover:bg-blue-900/60"
                 >
                   Swap
                 </button>
                 <button
-                  onClick={() => onKill(agent.sessionId)}
+                  onClick={() => onKill(agent.sessionId as string)}
                   className="px-2 py-0.5 text-[10px] rounded bg-red-900/40 text-red-400 hover:bg-red-900/60"
                 >
                   Kill
@@ -124,9 +138,9 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
           </div>
         </div>
         <div className="flex gap-3 mt-1 text-[10px] text-zinc-500">
-          <span>Model: {agent.model || '—'}</span>
-          <span>Session: {agent.sessionId ? agent.sessionId.slice(0, 8) + '...' : '—'}</span>
-          <span>Last: {timeAgo(agent.lastActivity)}</span>
+          <span>Model: {(agent.model as string) || '—'}</span>
+          <span>Session: {agent.sessionId ? (agent.sessionId as string).slice(0, 8) + '...' : '—'}</span>
+          <span>Last: {timeAgo(agent.lastActivity as string | undefined)}</span>
         </div>
       </div>
 
@@ -153,8 +167,8 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
               <div key={i} className="text-[11px] font-mono text-zinc-400 bg-zinc-900/50 rounded p-2">
                 {typeof entry === 'string' ? entry : (
                   <>
-                    <span className="text-zinc-600">{entry.timestamp || ''}</span>{' '}
-                    {entry.text || entry.message || JSON.stringify(entry)}
+                    <span className="text-zinc-600">{(entry as Record<string, unknown>).timestamp as string || ''}</span>{' '}
+                    {(entry as Record<string, unknown>).text as string || (entry as Record<string, unknown>).message as string || JSON.stringify(entry)}
                   </>
                 )}
               </div>
@@ -171,10 +185,10 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
                 <span className={`px-1.5 py-0.5 rounded text-[9px] font-medium ${
                   r.provider === 'claude' ? 'bg-purple-900/50 text-purple-300' : 'bg-emerald-900/50 text-emerald-300'
                 }`}>
-                  {r.provider || '?'}
+                  {(r.provider as string) || '?'}
                 </span>
-                <span className="text-zinc-400">{r.model || '—'}</span>
-                <span className="text-zinc-600 ml-auto">{r.complexity || '—'}</span>
+                <span className="text-zinc-400">{(r.model as string) || '—'}</span>
+                <span className="text-zinc-600 ml-auto">{(r.complexity as string) || '—'}</span>
                 {r.cached && <span className="text-amber-500 text-[9px]">cached</span>}
               </div>
             ))
@@ -188,13 +202,13 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
             <div className="space-y-1">
               {timeline.map((ev, i) => (
                 <div key={i} className="flex items-start gap-2 text-[11px]">
-                  <span className="text-zinc-600 font-mono whitespace-nowrap">{ev.time || timeAgo(ev.timestamp)}</span>
+                  <span className="text-zinc-600 font-mono whitespace-nowrap">{(ev.time as string) || timeAgo(ev.timestamp as string | undefined)}</span>
                   <span className={`px-1 rounded text-[9px] ${
                     ev.type === 'error' ? 'bg-red-900/50 text-red-400' :
                     ev.type === 'action' ? 'bg-blue-900/50 text-blue-400' :
                     'bg-zinc-800 text-zinc-400'
-                  }`}>{ev.type || 'event'}</span>
-                  <span className="text-zinc-300">{ev.message || ev.text || JSON.stringify(ev)}</span>
+                  }`}>{(ev.type as string) || 'event'}</span>
+                  <span className="text-zinc-300">{(ev.message as string) || (ev.text as string) || JSON.stringify(ev)}</span>
                 </div>
               ))}
             </div>
@@ -209,7 +223,11 @@ function AgentDetailPanel({ agent, detail, onNudge, onSwap, onKill }) {
 
 // ─── Global Timeline ─────────────────────────────────────────────────────────
 
-function TimelinePanel({ timeline }) {
+interface TimelinePanelProps {
+  timeline: Record<string, unknown>[];
+}
+
+function TimelinePanel({ timeline }: TimelinePanelProps) {
   if (!timeline || timeline.length === 0) {
     return <div className="text-xs text-zinc-600 p-3">No events yet</div>;
   }
@@ -219,14 +237,14 @@ function TimelinePanel({ timeline }) {
       {timeline.slice(-30).reverse().map((ev, i) => (
         <div key={i} className="flex items-start gap-2 text-[10px]">
           <span className="text-zinc-600 font-mono whitespace-nowrap">
-            {ev.time || (ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString() : '—')}
+            {(ev.time as string) || (ev.timestamp ? new Date(ev.timestamp as string).toLocaleTimeString() : '—')}
           </span>
           <span className={`px-1 rounded text-[9px] shrink-0 ${
             ev.severity === 'error' ? 'bg-red-900/50 text-red-400' :
             ev.severity === 'warn' ? 'bg-yellow-900/50 text-yellow-400' :
             'bg-zinc-800 text-zinc-400'
-          }`}>{ev.type || 'event'}</span>
-          <span className="text-zinc-400 truncate">{ev.message || ev.summary || ''}</span>
+          }`}>{(ev.type as string) || 'event'}</span>
+          <span className="text-zinc-400 truncate">{(ev.message as string) || (ev.summary as string) || ''}</span>
         </div>
       ))}
     </div>
@@ -235,7 +253,18 @@ function TimelinePanel({ timeline }) {
 
 // ─── Controls Panel ──────────────────────────────────────────────────────────
 
-function ControlsPanel({ engine, autonomyLevel, onSetLevel, pendingConfirmations, onConfirm, onDeny, onPause, onResume }) {
+interface ControlsPanelProps {
+  engine: Record<string, unknown> | null;
+  autonomyLevel: number;
+  onSetLevel: (level: number) => void;
+  pendingConfirmations: Record<string, unknown>[];
+  onConfirm: (id: string) => void;
+  onDeny: (id: string) => void;
+  onPause: () => void;
+  onResume: () => void;
+}
+
+function ControlsPanel({ engine, autonomyLevel, onSetLevel, pendingConfirmations, onConfirm, onDeny, onPause, onResume }: ControlsPanelProps) {
   const levels = Object.entries(AUTONOMY_LEVELS || {});
 
   return (
@@ -291,19 +320,19 @@ function ControlsPanel({ engine, autonomyLevel, onSetLevel, pendingConfirmations
           </div>
           <div className="space-y-1">
             {pendingConfirmations.map(c => (
-              <div key={c.id} className="flex items-center justify-between bg-zinc-900/50 rounded p-2">
+              <div key={c.id as string} className="flex items-center justify-between bg-zinc-900/50 rounded p-2">
                 <div className="text-[11px] text-zinc-300">
-                  <span className="text-zinc-500">{c.action}</span> on {c.taskId || c.sessionId || '—'}
+                  <span className="text-zinc-500">{c.action as string}</span> on {(c.taskId as string) || (c.sessionId as string) || '—'}
                 </div>
                 <div className="flex gap-1">
                   <button
-                    onClick={() => onConfirm(c.id)}
+                    onClick={() => onConfirm(c.id as string)}
                     className="px-2 py-0.5 rounded text-[9px] bg-green-900/50 text-green-400"
                   >
                     Approve
                   </button>
                   <button
-                    onClick={() => onDeny(c.id)}
+                    onClick={() => onDeny(c.id as string)}
                     className="px-2 py-0.5 rounded text-[9px] bg-red-900/50 text-red-400"
                   >
                     Deny
@@ -320,7 +349,11 @@ function ControlsPanel({ engine, autonomyLevel, onSetLevel, pendingConfirmations
 
 // ─── Subsystem Health Bar ────────────────────────────────────────────────────
 
-function SubsystemBar({ subsystems }) {
+interface SubsystemBarProps {
+  subsystems: Record<string, string> | null;
+}
+
+function SubsystemBar({ subsystems }: SubsystemBarProps) {
   if (!subsystems || Object.keys(subsystems).length === 0) return null;
 
   return (
@@ -358,14 +391,14 @@ export default function SwarmTab() {
   const [showTimeline, setShowTimeline] = useState(false);
 
   const selectedAgent = useMemo(
-    () => agents.find(a => a.id === selectedAgentId),
+    () => agents.find((a: Record<string, unknown>) => a.id === selectedAgentId),
     [agents, selectedAgentId]
   );
 
   const statusCounts = useMemo(() => {
-    const counts = { running: 0, idle: 0, stale: 0, failed: 0, passed: 0, total: agents.length };
+    const counts: Record<string, number> = { running: 0, idle: 0, stale: 0, failed: 0, passed: 0, total: agents.length };
     for (const a of agents) {
-      if (counts[a.status] !== undefined) counts[a.status]++;
+      if (counts[a.status as string] !== undefined) counts[a.status as string]++;
     }
     return counts;
   }, [agents]);
@@ -413,9 +446,9 @@ export default function SwarmTab() {
           {agents.length === 0 ? (
             <div className="text-xs text-zinc-600 p-3">No agents detected</div>
           ) : (
-            agents.map(a => (
+            agents.map((a: Record<string, unknown>) => (
               <AgentCard
-                key={a.id}
+                key={a.id as string}
                 agent={a}
                 selected={a.id === selectedAgentId}
                 onSelect={selectAgent}
@@ -440,7 +473,7 @@ export default function SwarmTab() {
       {/* Controls */}
       <ControlsPanel
         engine={engine}
-        autonomyLevel={engine?.autonomyLevel ?? 3}
+        autonomyLevel={engine?.autonomyLevel as number ?? 3}
         onSetLevel={setAutonomyLevel}
         pendingConfirmations={pendingConfirmations}
         onConfirm={confirmAction}
