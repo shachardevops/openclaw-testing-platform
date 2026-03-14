@@ -101,6 +101,18 @@
       "criticalThresholdTokens": 500000
     }
   },
+  "vectorMemory": {
+    "enabled": true,
+    "dimensions": 384,
+    "collections": {
+      "learnings": { "maxVectors": 5000 },
+      "decisions": { "maxVectors": 2000 },
+      "patterns": { "maxVectors": 3000 }
+    },
+    "similarityThreshold": 0.75,
+    "enableLearning": false,
+    "fallbackToKeyword": true
+  },
   "modelFallback": {
     "enabled": true,
     "errorPatterns": ["overloaded", "rate limit", "rate_limit", "429", "529", "capacity", "api is busy", "too many requests", "server_error", "service_unavailable", "Request timed out"],

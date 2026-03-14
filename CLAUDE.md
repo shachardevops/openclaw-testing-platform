@@ -123,6 +123,9 @@ Tracks per-task and per-model token usage with cost estimation. Implements ruflo
 #### Quality Gates (`lib/quality-gates.js`, `/api/quality-gates`)
 Configurable validation before pipeline advancement: minPassRate, maxP1Bugs, maxFailures, requireReport, custom checks. Fail action: `warn` (log + continue) or `block` (pause pipeline). Config: `qualityGates`.
 
+#### Vector Memory / RuVector (`lib/vector-memory.js`, `/api/vector-search`)
+Semantic search over agent learnings, orchestrator decisions, and QA patterns. Ships with an in-memory fallback (TF-IDF hash + cosine similarity brute-force). When `ruvector` npm package is installed, upgrades to HNSW index with GNN learning. Three collections: learnings, decisions, patterns. Hybrid search (semantic + keyword) for best recall. Config: `vectorMemory`. Note: RuVector's SonaEngine self-learning is disabled by default due to upstream bugs (#257, #258).
+
 #### Learning Loop (`lib/learning-loop.js`, `/api/learning-loop`)
 RETRIEVE→JUDGE→DISTILL→CONSOLIDATE cycle. Learns from task results (bug patterns, recurring failures) and orchestrator decisions. Tracks model performance with pass rates. Persists to `memory/learnings.json` and `memory/model-stats.json`. Config: `learningLoop`.
 
