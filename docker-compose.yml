@@ -104,10 +104,27 @@ services:
     container_name: openclaw-grafana
     restart: unless-stopped
     environment:
+      # ── Auth & Access ──
       GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
-      GF_SERVER_HTTP_PORT: 3001
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      # ── Server ──
+      GF_SERVER_HTTP_PORT: 3001
+      GF_SERVER_ROOT_URL: "http://localhost:${GRAFANA_PORT:-3001}"
+      # ── Branding ──
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      # ── Datasource (injected into provisioning via env) ──
+      # These match the ruvector-db service defaults above.
+      # The provisioning YAML at docker/grafana/provisioning/datasources/
+      # uses these same defaults so everything connects out of the box.
+      RUVECTOR_DB_HOST: ruvector-db
+      RUVECTOR_DB_PORT_INTERNAL: "5432"
+      RUVECTOR_DB_USER: ${RUVECTOR_DB_USER:-ruvector}
+      RUVECTOR_DB_PASSWORD: ${RUVECTOR_DB_PASSWORD:-ruvector_secret}
+      RUVECTOR_DB_NAME: ${RUVECTOR_DB_NAME:-openclaw_vectors}
     ports:
       - "${GRAFANA_PORT:-3001}:3001"
     volumes:

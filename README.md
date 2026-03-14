@@ -13,6 +13,229 @@ The platform spawns and manages AI agents that run QA test stories against a tar
 - **Vector memory** — semantic search over past learnings, decisions, and patterns via RuVector
 - **Self-healing** — circuit breakers, retry with backoff, and automated recovery workflows
 
+## How Everything Works Together
+
+The platform combines five major subsystems into a unified QA automation engine:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         OPENCLAW TESTING PLATFORM                       │
+│                                                                         │
+│  ┌───────────┐    ┌──────────────┐    ┌──────────────────────────────┐ │
+│  │  React UI │───→│  API Routes  │───→│  OpenClaw CLI (Multi-Agent)  │ │
+│  │  (Next.js)│←───│  (Node.js)   │    │  Fire-and-forget spawns      │ │
+│  └───────────┘    └──────────────┘    └──────────────────────────────┘ │
+│       ↕                ↕                         ↕                     │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │              ORCHESTRATOR ENGINE (30s tick)                      │   │
+│  │  Drift Detection → Decision Tree → Consensus → Action          │   │
+│  │  Autonomy Levels: 0=manual → 4=adaptive                        │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│       ↕                ↕                         ↕                     │
+│  ┌──────────┐  ┌──────────────┐  ┌─────────────────────────────────┐ │
+│  │ RuVector │  │ Memory Tiers │  │ Resilience Layer                │ │
+│  │ DB       │  │ Work→Epis→   │  │ Self-Healing + Circuit Breaker  │ │
+│  │ (Docker) │  │ Semantic     │  │ Task Claims + Quality Gates     │ │
+│  └──────────┘  └──────────────┘  │ Audit Trail + Token Tracking    │ │
+│       ↕                          └─────────────────────────────────┘ │
+│  ┌──────────┐  ┌──────────────┐                                     │
+│  │ Grafana  │  │ pgAdmin      │                                     │
+│  │ (Docker) │  │ (Docker)     │                                     │
+│  └──────────┘  └──────────────┘                                     │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 1. OpenClaw — Multi-Agent Swarm Execution
+
+OpenClaw is the AI agent runtime. The dashboard acts as a **control plane** that dispatches tasks to a **controller session** (a persistent OpenClaw agent). The controller then spawns individual agent sessions for each QA task.
+
+**Dispatch flow:**
+
+```
+User clicks "Run" in dashboard
+  → POST /api/run-agent-start
+  → Renders message template from project.json (e.g., "[dashboard-run] Task: login-flow...")
+  → lib/openclaw.js spawnAgent() — child_process.spawn(detached, unref)
+  → OpenClaw CLI sends message to controller session via gateway
+  → Controller spawns a sub-agent with the specified model
+  → Sub-agent reads the test story (stories/{taskId}.md)
+  → Executes test cases against target app (OrderTu)
+  → Writes results to ~/.openclaw/workspace/qa-dashboard/results/{taskId}.json
+  → Dashboard polls GET /api/results every 2-8s → UI updates
+```
+
+**Key design decisions:**
+- **Fire-and-forget**: `spawn()` with `detached: true` + `unref()`. The dashboard never blocks on agent execution.
+- **Message prefixes**: `[dashboard-run]`, `[dashboard-cancel]`, `[dashboard-nudge]`, `[dashboard-kill]`, `[dashboard-model-swap]` — these route commands through the controller.
+- **Session ID resolution**: Reads from `pipeline-config.json` or `OPENCLAW_SESSION_ID` env var. Cached 30s to avoid blocking CLI calls.
+
+### 2. Orchestrator — Deterministic Session Management
+
+The orchestrator engine (`lib/orchestrator-engine.js`) runs a **30-second tick loop** that monitors all active agent sessions and takes corrective action.
+
+**Three-layer decision architecture:**
+
+| Layer | What It Does | Speed |
+|-------|-------------|-------|
+| **L1 — Condition Tracker** | Deduplicates events so the same stale session doesn't trigger repeated nudges | Instant |
+| **L2 — Deterministic Decision Tree** | Pattern-matching: stale → nudge → model swap → kill. Orphaned → purge. Duplicate → kill one. | Instant |
+| **L3 — AI Consultation** | Unrecognized patterns sent as one-shot gateway chat. Decision stored in `decision-memory.json`. On next occurrence, acts from memory (no AI). | ~2-5s |
+
+**Escalation ladder** (configurable in `project.json`):
+
+```
+Session healthy ──→ reset escalation level
+                    │
+Session stale (3min) ──→ Nudge ("Continue your work, you appear stuck")
+                         │
+Still stale (8min) ──→ Model Swap (switch to fallback model without restart)
+                       │
+Still stale (15min) ──→ Kill (terminate session, mark task failed)
+```
+
+**Autonomy levels** control how much the orchestrator can do without human approval:
+
+| Level | Name | Auto Actions |
+|-------|------|-------------|
+| 0 | Manual | None — all actions require confirmation |
+| 1 | Supervised | Auto-nudge only |
+| 2 | Guided | Auto-nudge + auto-swap |
+| 3 | Autonomous | Full auto + AI consultation |
+| 4 | Adaptive | Full auto + auto-approve AI recommendations |
+
+### 3. RuVector — Semantic Vector Memory
+
+[RuVector](https://github.com/ruvnet/ruvector) provides semantic search over QA knowledge. Instead of exact-match lookups, agents can find *similar* past experiences ("find runs where the agent got stuck on login flows").
+
+**Three-tier architecture:**
+
+```
+                   ┌─────────────────────┐
+                   │  SEMANTIC MEMORY     │  Persistent, high-value knowledge
+                   │  200 entries         │  Auto-promoted from episodic
+                   │  Min importance: 0.7 │  Survives restarts
+                   └──────────↑──────────┘
+                              │ consolidation (every 5min)
+                   ┌──────────┴──────────┐
+                   │  EPISODIC MEMORY     │  Recent patterns, time-decayed
+                   │  500 entries         │  24h importance half-life
+                   │  Updated on complete │
+                   └──────────↑──────────┘
+                              │ promotion
+                   ┌──────────┴──────────┐
+                   │  WORKING MEMORY      │  Fast, volatile LRU cache
+                   │  100 entries         │  10min TTL
+                   │  Current session     │  Checked every tick
+                   └─────────────────────┘
+```
+
+**Vector collections (in RuVector PostgreSQL):**
+
+| Collection | Stores | Used By |
+|------------|--------|---------|
+| `learnings` | "Bug found in X, solution Y" | Learning loop, agent context |
+| `decisions` | "Orchestrator swapped model because Z" | Orchestrator Layer 3 |
+| `patterns` | "Test X always fails with error Y" | Pipeline planning |
+
+**Fallback chain:**
+1. Native RuVector HNSW (if `ruvector` npm package installed) — sub-millisecond
+2. In-memory TF-IDF + cosine brute-force (always available) — milliseconds
+3. Keyword search (text contains) — milliseconds
+
+### 4. Pipeline System — Sequential Task Orchestration
+
+Pipelines run multiple test tasks in sequence with quality gates between stages:
+
+```
+Pipeline "smoke-tests"
+  ├── Task: login-flow      ──→ Run ──→ Poll ──→ Quality Gate ──→ Pass
+  ├── Task: menu-navigation ──→ Run ──→ Poll ──→ Quality Gate ──→ Pass
+  ├── Task: order-flow       ──→ Run ──→ Poll ──→ Quality Gate ──→ Warn (maxP1Bugs)
+  └── Task: payment-flow     ──→ Run ──→ Poll ──→ Quality Gate ──→ Complete
+                                                       ↓
+                                               Learning Loop records
+                                               patterns + model stats
+```
+
+**Quality gate rules** (configurable):
+- `minPassRate` — minimum % of tests that must pass
+- `maxP1Bugs` — maximum critical bugs allowed
+- `maxFailures` — maximum total test failures
+- `requireReport` — markdown report must exist
+- Fail action: `warn` (log + continue) or `block` (pause pipeline)
+
+### 5. Resilience Layer — Enterprise-Grade Fault Tolerance
+
+Multiple systems work together to keep the swarm healthy:
+
+| System | Purpose | Key Pattern |
+|--------|---------|-------------|
+| **Self-Healing** | Automatic retry with backoff | Circuit breaker: CLOSED → OPEN (5 failures) → HALF_OPEN → CLOSED |
+| **Drift Detection** | Prevent agents from going off-track | Checkpoint verification, silence alerts, output loop detection |
+| **Consensus Validator** | Validate critical actions | Byzantine voting: 2/3 quorum for kill/recover/respawn |
+| **Task Claims** | Prevent duplicate work | Exclusive ownership with 30min TTL auto-expiry |
+| **Audit Trail** | Tamper-evident event log | SHA-256 hash-chained events, chain integrity verification |
+| **Token Tracker** | Cost monitoring | Per-task/per-model usage, cost alerts at 100K/500K tokens |
+| **Security Validator** | Input validation | Path traversal prevention, command injection blocking, rate limiting |
+
+**How they connect during a recovery scenario:**
+
+```
+Agent session goes stale (3min no activity)
+  → Drift detector flags "silence" event
+  → Orchestrator Layer 2 picks up "stale" condition
+  → Orchestrator proposes "nudge" action
+  → Consensus validator checks:
+      Orchestrator: approve (stale detected)
+      Drift detector: approve (no active drift conflict)
+      Self-healing: approve (circuit not open)
+  → Quorum reached (3/3) → nudge approved
+  → Task claims verified (task still owned by this session)
+  → Nudge message sent via spawnAgent()
+  → Audit trail records event with hash chain
+  → Token tracker estimates cost impact
+  → If nudge fails → escalate to model swap → kill
+  → Self-healing circuit breaker tracks failure count
+```
+
+### 6. Learning Loop — Continuous Improvement
+
+After each task completes, the learning loop extracts knowledge:
+
+```
+Task completes with results
+  → RETRIEVE: Load existing patterns from learnings.json
+  → JUDGE: Compare findings against known patterns
+  → DISTILL: Extract new patterns (bug type, frequency, model effectiveness)
+  → CONSOLIDATE: Store in vector memory + pattern DB
+  → ROUTE: Update model stats for future routing decisions
+```
+
+**Model performance tracking:**
+- Per-model pass/fail counts and average token usage
+- Cost efficiency scoring
+- Recommendations for 3-tier routing (simple → cheap model, complex → capable model)
+
+### Data Flow Summary
+
+```
+User Action           │ System Response
+──────────────────────┼──────────────────────────────────────────
+Click "Run Task"      │ → API → claim task → spawn agent → poll results
+                      │ → orchestrator monitors session health
+                      │ → drift detector watches for stalls/loops
+Task completes        │ → quality gate evaluates pass/fail thresholds
+                      │ → learning loop extracts patterns → vector memory
+                      │ → token tracker records usage → cost alerts
+                      │ → audit trail logs completion
+Pipeline advances     │ → next task dispatched (if gate passes)
+                      │ → previous learnings loaded into agent context
+Agent gets stuck      │ → orchestrator nudges → swaps model → kills
+                      │ → consensus validates critical actions
+                      │ → self-healing retries with backoff
+                      │ → circuit breaker prevents cascade
+```
+
 ## Architecture
 
 ```
@@ -22,11 +245,11 @@ UI (React 19)
   → OpenClaw CLI writes results to ~/.openclaw/workspace/
   → Dashboard polls results every 2s → UI updates
 
-RuVector DB (PostgreSQL + vector extensions)
+RuVector DB (PostgreSQL + vector extensions via Docker)
   → Stores agent learnings, orchestrator decisions, QA patterns
   → HNSW + GNN indexing for semantic search
-  → pgAdmin UI for database management
   → Grafana dashboards for monitoring & visualization
+  → pgAdmin UI for database management
 ```
 
 ## Prerequisites
