@@ -18,6 +18,8 @@ function snapshotsDir() {
  *
  * Returns the stored app log snapshot for a specific finding.
  */
+const SAFE_ID = /^[a-zA-Z0-9_-]+$/;
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const taskId = url.searchParams.get('taskId');
@@ -25,6 +27,9 @@ export async function GET(request: NextRequest) {
 
   if (!taskId) {
     return Response.json({ ok: false, error: 'taskId required' }, { status: 400 });
+  }
+  if (!SAFE_ID.test(taskId)) {
+    return Response.json({ ok: false, error: 'Invalid taskId format' }, { status: 400 });
   }
 
   // If findingId given, return specific snapshot

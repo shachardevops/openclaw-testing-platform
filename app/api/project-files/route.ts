@@ -108,7 +108,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return Response.json({ ok: true, folder, files, dirPath });
+    return Response.json({ ok: true, folder, files });
   } catch (e: unknown) {
     return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }

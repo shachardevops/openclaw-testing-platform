@@ -5,6 +5,8 @@ import { getProjectConfig } from '@/lib/project-loader';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const SAFE_ID = /^[a-zA-Z0-9_-]+$/;
+
 function renderTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
@@ -13,6 +15,7 @@ export async function POST(request: NextRequest) {
   try {
     const { agentId } = await request.json() as { agentId: string };
     if (!agentId) throw new Error('agentId is required');
+    if (!SAFE_ID.test(agentId)) throw new Error('Invalid agentId format');
 
     const sessionId = getControllerSessionId();
     if (!sessionId) throw new Error('controllerSessionId missing in pipeline-config.json');
@@ -38,6 +41,6 @@ export async function POST(request: NextRequest) {
     const output = await execAgent(sessionId, msg);
     return Response.json({ ok: true, cancelled: true, sessionId, output: (output || '').slice(0, 600) });
   } catch (e: unknown) {
-    return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
+    return Response.json({ ok: false, error: (e as Error).message }, { status: 400 });
   }
 }

@@ -214,7 +214,6 @@ export async function POST(request: NextRequest) {
         stdio: ['ignore', logFd, logFd],
         detached: true,
         env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1', PORT: String(config.port || 3000) },
-        shell: true,
       });
 
       fs.closeSync(logFd);

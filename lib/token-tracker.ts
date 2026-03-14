@@ -171,7 +171,7 @@ class TokenTracker {
     return {
       enabled: config.enabled,
       sessionTotalTokens: this._sessionTotal,
-      sessionEstimatedCost: Math.round(this._sessionTotal * 0.005 / 1000 * 10000) / 10000,
+      sessionEstimatedCost: Math.round(this._sessionTotal * (MODEL_COSTS['default'] || 0.005) / 1000 * 10000) / 10000,
       modelStats,
       mostEfficient: this.getMostEfficientModel(),
       taskCount: this._taskUsage.size,

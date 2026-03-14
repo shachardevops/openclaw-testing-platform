@@ -33,9 +33,13 @@ export async function GET(request: NextRequest) {
           const length = Math.min(Math.max(0, size - offset), MAX_CHUNK);
           if (length > 0) {
             const fd = fs.openSync(logPath, 'r');
-            const buf = Buffer.alloc(length);
-            fs.readSync(fd, buf, 0, length, offset);
-            fs.closeSync(fd);
+            let buf: Buffer;
+            try {
+              buf = Buffer.alloc(length);
+              fs.readSync(fd, buf, 0, length, offset);
+            } finally {
+              fs.closeSync(fd);
+            }
             offset += length;
             send({ ok: true, text: buf.toString('utf8'), nextOffset: offset, exists: true });
           }

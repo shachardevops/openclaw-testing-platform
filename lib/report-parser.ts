@@ -69,7 +69,7 @@ export function tryFinalizeFromReport(
 
   const reportStat = fs.statSync(reportPath);
   const startedMs = payload.startedAt ? Date.parse(payload.startedAt) : 0;
-  if (startedMs && reportStat.mtimeMs < startedMs) return null;
+  if (Number.isFinite(startedMs) && startedMs > 0 && reportStat.mtimeMs < startedMs) return null;
 
   let markdown: string;
   try { markdown = fs.readFileSync(reportPath, 'utf8'); } catch { return null; }

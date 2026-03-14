@@ -18,11 +18,13 @@ export async function GET(request: NextRequest) {
     const start = Math.min(offset, size);
     const length = Math.max(0, size - start);
     const fd = fs.openSync(logPath, 'r');
-    const buf = Buffer.alloc(length);
-    if (length > 0) fs.readSync(fd, buf, 0, length, start);
-    fs.closeSync(fd);
-
-    return Response.json({ ok: true, text: buf.toString('utf8'), nextOffset: size, exists: true });
+    try {
+      const buf = Buffer.alloc(length);
+      if (length > 0) fs.readSync(fd, buf, 0, length, start);
+      return Response.json({ ok: true, text: buf.toString('utf8'), nextOffset: size, exists: true });
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch (e: unknown) {
     return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }

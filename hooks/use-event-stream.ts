@@ -23,6 +23,7 @@ export function useEventStream({ onEvent, enabled = true, reconnectMs = 2000, ma
   onEventRef.current = onEvent;
   const retriesRef = useRef(0);
   const esRef = useRef<EventSource | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const connect = useCallback(() => {
     if (esRef.current) {
@@ -59,7 +60,7 @@ export function useEventStream({ onEvent, enabled = true, reconnectMs = 2000, ma
       if (retriesRef.current < maxRetries) {
         const delay = reconnectMs * Math.pow(2, Math.min(retriesRef.current, 5));
         retriesRef.current++;
-        setTimeout(connect, delay);
+        retryTimerRef.current = setTimeout(connect, delay);
       }
     };
   }, [reconnectMs, maxRetries]);
@@ -68,6 +69,10 @@ export function useEventStream({ onEvent, enabled = true, reconnectMs = 2000, ma
     if (!enabled) return;
     connect();
     return () => {
+      if (retryTimerRef.current) {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = null;
+      }
       if (esRef.current) {
         esRef.current.close();
         esRef.current = null;

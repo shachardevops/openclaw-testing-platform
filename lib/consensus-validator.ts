@@ -65,6 +65,7 @@ class ConsensusValidator {
           confidence: vote.confidence ?? 1,
         });
       } catch (e: unknown) {
+        console.error(`[consensus] Voter "${name}" threw for action "${actionType}":`, (e as Error).message);
         votes.push({
           voter: name,
           approve: false,

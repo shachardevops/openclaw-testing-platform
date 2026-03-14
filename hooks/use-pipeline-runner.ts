@@ -22,6 +22,7 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
   const allPipelines: (PipelineDefinition | CustomPipeline)[] = [...PIPELINES, ...state.customPipelines];
   const TASK_IDS = TASKS.map(t => t.id);
   const prevResultsRef = useRef<ResultsMap>({});
+  const queueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep a fresh ref of activePipeline to avoid stale closures in setTimeout callbacks
   const activePipelineRef = useRef<ActivePipeline>(state.activePipeline);
@@ -69,7 +70,7 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
     activePipelineRef.current = { ...activePipelineRef.current, ...newAp };
     dispatch({ type: 'SET_ACTIVE_PIPELINE', data: newAp as unknown as Partial<ActivePipeline> });
     addLog('PIPELINE', `Started: ${name} (${taskIds.length} tasks)`);
-    setTimeout(queueNext, 100);
+    queueTimerRef.current = setTimeout(queueNext, 100);
   }, [dispatch, addLog, queueNext]);
 
   // Start a pipeline by ID
@@ -80,7 +81,7 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
     activePipelineRef.current = { ...activePipelineRef.current, ...newAp };
     dispatch({ type: 'SET_ACTIVE_PIPELINE', data: newAp as unknown as Partial<ActivePipeline> });
     addLog('PIPELINE', `Started: ${p.name} (${p.taskIds.length} tasks)`);
-    setTimeout(queueNext, 100);
+    queueTimerRef.current = setTimeout(queueNext, 100);
   }, [allPipelines, dispatch, addLog, queueNext]);
 
   // Stop the active pipeline
@@ -135,12 +136,19 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
         const newAp = { currentTaskId: null, finished: fin };
         activePipelineRef.current = { ...activePipelineRef.current, ...newAp };
         dispatch({ type: 'SET_ACTIVE_PIPELINE', data: newAp });
-        setTimeout(queueNext, 100);
+        queueTimerRef.current = setTimeout(queueNext, 100);
       }
     }
 
     prevResultsRef.current = results;
   }, [TASK_IDS, TASKS, dispatch, addLog, queueNext]);
+
+  // Cleanup pending queue timer on unmount
+  useEffect(() => {
+    return () => {
+      if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
+    };
+  }, []);
 
   return { allPipelines, runPipeline, runInlinePipeline, stopPipeline, queueNext, onPollResults };
 }

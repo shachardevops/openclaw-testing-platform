@@ -8,6 +8,8 @@ import { startRecording } from '@/lib/screencast-recorder';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+const SAFE_ID = /^[a-zA-Z0-9_-]+$/;
+
 function renderTemplate(template: string, vars: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
@@ -21,6 +23,7 @@ export async function POST(request: NextRequest) {
       skills?: string[];
     };
     if (!agentId) throw new Error('agentId required');
+    if (!SAFE_ID.test(agentId)) throw new Error('Invalid agentId format');
 
     const sessionId = getControllerSessionId();
     if (!sessionId) throw new Error('controllerSessionId missing in pipeline-config.json');

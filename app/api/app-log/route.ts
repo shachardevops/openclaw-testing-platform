@@ -28,18 +28,20 @@ export async function GET(request: NextRequest) {
       const start = Math.max(0, end - limitBytes);
       const length = Math.max(0, end - start);
       const fd = fs.openSync(logPath, 'r');
-      const buf = Buffer.alloc(length);
-      if (length > 0) fs.readSync(fd, buf, 0, length, start);
-      fs.closeSync(fd);
-
-      return Response.json({
-        ok: true,
-        text: buf.toString('utf8'),
-        nextOffset: size,
-        headOffset: start,
-        truncatedHead: start > 0,
-        exists: true,
-      });
+      try {
+        const buf = Buffer.alloc(length);
+        if (length > 0) fs.readSync(fd, buf, 0, length, start);
+        return Response.json({
+          ok: true,
+          text: buf.toString('utf8'),
+          nextOffset: size,
+          headOffset: start,
+          truncatedHead: start > 0,
+          exists: true,
+        });
+      } finally {
+        fs.closeSync(fd);
+      }
     }
 
     let start = Math.min(offset, size);
@@ -51,18 +53,20 @@ export async function GET(request: NextRequest) {
 
     const length = Math.min(Math.max(0, size - start), 512 * 1024); // cap at 512KB
     const fd = fs.openSync(logPath, 'r');
-    const buf = Buffer.alloc(length);
-    if (length > 0) fs.readSync(fd, buf, 0, length, start);
-    fs.closeSync(fd);
-
-    return Response.json({
-      ok: true,
-      text: buf.toString('utf8'),
-      nextOffset: start + length,
-      headOffset: truncatedHead ? start : 0,
-      truncatedHead,
-      exists: true,
-    });
+    try {
+      const buf = Buffer.alloc(length);
+      if (length > 0) fs.readSync(fd, buf, 0, length, start);
+      return Response.json({
+        ok: true,
+        text: buf.toString('utf8'),
+        nextOffset: start + length,
+        headOffset: truncatedHead ? start : 0,
+        truncatedHead,
+        exists: true,
+      });
+    } finally {
+      fs.closeSync(fd);
+    }
   } catch (e: unknown) {
     return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }
