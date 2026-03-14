@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ask, askClaude, askCodex, getAvailableProviders, askWithGatewayFallback, getDirectAIStats, getDirectAIHistory } from '@/lib/direct-ai';
-import { validateApiRequest } from '@/lib/security-validator';
+import { validateInput } from '@/lib/security-validator';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,16 +31,19 @@ export async function GET() {
  */
 export async function POST(req) {
   try {
-    const validation = validateApiRequest(req, 'direct-ai');
-    if (!validation.valid) {
-      return NextResponse.json({ ok: false, error: validation.error }, { status: 400 });
-    }
-
     const body = await req.json();
     const { prompt, provider, taskType, system, model, maxTokens, temperature, gatewayFallback } = body;
 
     if (!prompt || typeof prompt !== 'string') {
       return NextResponse.json({ ok: false, error: 'prompt is required' }, { status: 400 });
+    }
+
+    // Validate known fields
+    const validation = validateInput(
+      { ...(model ? { model } : {}), ...(prompt ? { message: prompt } : {}) }
+    );
+    if (!validation.valid) {
+      return NextResponse.json({ ok: false, error: 'Validation failed', details: validation.errors }, { status: 400 });
     }
 
     const opts = {

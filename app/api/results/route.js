@@ -5,6 +5,7 @@ import { getTaskIdSet, getProjectConfig } from '@/lib/project-loader';
 import { tryFinalizeFromReport } from '@/lib/report-parser';
 import { normalizeResult } from '@/lib/normalize-status';
 import orchestratorEngine from '@/lib/orchestrator-engine';
+import learningLoop from '@/lib/learning-loop';
 import { stopRecording, getRecordingStatus, listActiveRecordings } from '@/lib/screencast-recorder';
 import { listSessionsSync } from '@/lib/openclaw';
 import appLogRing from '@/lib/app-log-ring';
@@ -130,6 +131,8 @@ export async function GET() {
         const finalized = tryFinalizeFromReport(key, rpDir, payload);
         if (finalized) {
           fs.writeFileSync(fullPath, JSON.stringify(finalized, null, 2));
+          // Feed finalized result to learning loop for pattern extraction
+          try { learningLoop.learnFromResult(key, finalized, rpDir); } catch { /* best-effort */ }
           payload = finalized;
         }
 

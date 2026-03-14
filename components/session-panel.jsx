@@ -13,6 +13,7 @@ import OrchestratorTab from '@/components/orchestrator-tab';
 import { useOrchestrator } from '@/hooks/use-orchestrator';
 import AppLogTab from '@/components/app-log-tab';
 import DirectAITab from '@/components/direct-ai-tab';
+import SwarmTab from '@/components/swarm-tab';
 import RecordingPlayer from '@/components/recording-player';
 
 /** Shared markdown components for consistent rendering */
@@ -143,6 +144,7 @@ function CopyButton({ getText }) {
 const TABS = [
   { id: 'output', label: 'Session' },
   { id: 'orchestrator', label: 'Orchestrator' },
+  { id: 'swarm', label: 'Swarm' },
   { id: 'sessions', label: 'Sessions' },
   { id: 'stories', label: 'Stories' },
   { id: 'reports', label: 'Reports' },
@@ -395,6 +397,9 @@ export default function SessionPanel() {
         </TabPane>
         <TabPane active={tab === 'orchestrator'} visited={visitedTabs.has('orchestrator')}>
           <OrchestratorTab />
+        </TabPane>
+        <TabPane active={tab === 'swarm'} visited={visitedTabs.has('swarm')}>
+          <SwarmTab />
         </TabPane>
         <TabPane active={tab === 'sessions'} visited={visitedTabs.has('sessions')}>
           <SessionManagerTab />

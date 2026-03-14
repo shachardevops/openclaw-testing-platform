@@ -3,7 +3,7 @@
   "name": "OrderTu QA Command Center",
   "subtitle": "Multi-Agent Testing Platform",
   "icon": "\u26a1",
-  "workspace": "/Users/shacharcohen/.openclaw/workspace/qa-dashboard",
+  "workspace": "~/.openclaw/workspace/qa-dashboard",
   "sessionManager": {
     "scanIntervalMs": 10000,
     "maxActiveSessions": 4,
@@ -17,10 +17,10 @@
   },
   "targetApp": {
     "name": "OrderTu",
-    "path": "/Users/shacharcohen/ordertu",
+    "path": "~/ordertu",
     "command": "pnpm dev",
     "port": 3000,
-    "logFile": "/Users/shacharcohen/.openclaw/workspace/qa-dashboard/app-server.log"
+    "logFile": "~/.openclaw/workspace/qa-dashboard/app-server.log"
   },
   "orchestrator": {
     "enabled": true,
