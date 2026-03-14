@@ -79,9 +79,16 @@ vi.mock('@/lib/token-tracker', () => ({ default: {} }));
 vi.mock('@/lib/memory-tiers', () => ({ default: { setWorking: vi.fn() } }));
 vi.mock('@/lib/service-registry', () => ({ registry: { register: vi.fn() } }));
 
-// Mock fs to control results directory reads
+// Mock fs to control results directory reads (async fs.promises used by _loadResultsIndex)
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
+  const readFileMock = vi.fn(async (p: string) => {
+    if (typeof p === 'string' && p.includes('task-1.json')) {
+      return JSON.stringify({ status: 'running', model: 'anthropic/claude-sonnet-4-6', startedAt: new Date(Date.now() - 600000).toISOString() });
+    }
+    if (typeof p === 'string' && p.includes('decision-memory')) return '{}';
+    return '{}';
+  });
   return {
     ...actual,
     default: {
@@ -92,20 +99,24 @@ vi.mock('fs', async () => {
         if (typeof p === 'string' && p.includes('cooldown')) return false;
         return actual.existsSync(p);
       }),
-      readdirSync: vi.fn((p: string) => {
-        if (typeof p === 'string' && p.includes('test-results')) return ['task-1.json'];
-        return actual.readdirSync(p);
-      }),
       readFileSync: vi.fn((p: string, encoding?: string) => {
-        if (typeof p === 'string' && p.includes('task-1.json')) {
-          return JSON.stringify({ status: 'running', model: 'anthropic/claude-sonnet-4-6', startedAt: new Date(Date.now() - 600000).toISOString() });
-        }
         if (typeof p === 'string' && p.includes('decision-memory')) return '{}';
         return actual.readFileSync(p, encoding as any);
       }),
       writeFileSync: vi.fn(),
       appendFileSync: vi.fn(),
       mkdirSync: vi.fn(),
+      promises: {
+        readdir: vi.fn(async (p: string) => {
+          if (typeof p === 'string' && p.includes('test-results')) return ['task-1.json'];
+          return [];
+        }),
+        readFile: readFileMock,
+        writeFile: vi.fn(async () => {}),
+        appendFile: vi.fn(async () => {}),
+        mkdir: vi.fn(async () => {}),
+        access: vi.fn(async () => {}),
+      },
     },
   };
 });
@@ -192,9 +203,9 @@ describe('Escalation Ladder', () => {
     const entry = createStaleEntry('s1', 'task-1', 200000);
     mockRegistry.set('s1', entry);
 
-    // Override the results to show task started recently (within grace period)
+    // Override results to show task started recently (within grace period)
     const fs = await import('fs');
-    (fs.default.readFileSync as any).mockImplementation((p: string) => {
+    (fs.default.promises.readFile as any).mockImplementation(async (p: string) => {
       if (typeof p === 'string' && p.includes('task-1.json')) {
         return JSON.stringify({ status: 'running', model: 'anthropic/claude-sonnet-4-6', startedAt: new Date().toISOString() });
       }
@@ -213,7 +224,7 @@ describe('Escalation Ladder', () => {
     mockRegistry.set('s1', entry);
 
     const fs = await import('fs');
-    (fs.default.readFileSync as any).mockImplementation((p: string) => {
+    (fs.default.promises.readFile as any).mockImplementation(async (p: string) => {
       if (typeof p === 'string' && p.includes('task-1.json')) {
         return JSON.stringify({ status: 'passed', model: 'anthropic/claude-sonnet-4-6' });
       }

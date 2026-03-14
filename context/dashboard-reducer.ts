@@ -14,7 +14,6 @@ export const INITIAL_STATE: DashboardState = {
   // Gateway + streaming state
   gatewayStatus: 'unknown',
   streamingText: {},
-  sessions: [],
 };
 
 export function dashboardReducer(state: DashboardState, a: DashboardAction): DashboardState {
@@ -86,10 +85,6 @@ export function dashboardReducer(state: DashboardState, a: DashboardAction): Das
       delete next[a.taskId];
       return { ...state, streamingText: next };
     }
-
-    // Sessions
-    case 'SET_SESSIONS':
-      return { ...state, sessions: a.sessions };
 
     default:
       return state;

@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
         if (!taskId || !result) {
           return Response.json({ ok: false, error: 'Missing taskId or result' }, { status: 400 });
         }
-        learningLoop.learnFromResult(taskId, result, reportsDir());
+        await learningLoop.learnFromResult(taskId, result, reportsDir());
         return Response.json({ ok: true });
       }
 

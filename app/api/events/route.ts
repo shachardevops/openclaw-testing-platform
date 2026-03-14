@@ -1,10 +1,14 @@
 import eventBus from '@/lib/event-bus';
 import type { SSEEvent } from '@/lib/event-bus';
+import resultsWatcher from '@/lib/results-watcher';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
+  // Start the fs.watch-based results watcher on first SSE connection
+  resultsWatcher.ensureWatching();
+
   const encoder = new TextEncoder();
   let unsubscribe: (() => void) | null = null;
   let heartbeatTimer: ReturnType<typeof setInterval> | null = null;

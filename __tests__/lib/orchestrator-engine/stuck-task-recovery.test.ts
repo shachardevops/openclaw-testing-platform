@@ -58,6 +58,16 @@ vi.mock('@/lib/service-registry', () => ({ registry: { register: vi.fn() } }));
 // Mock fs — task is running but no session exists (stuck task scenario)
 vi.mock('fs', async () => {
   const actual = await vi.importActual<typeof import('fs')>('fs');
+  const readFileMock = vi.fn(async (p: string) => {
+    if (typeof p === 'string' && p.includes('stuck-task.json')) {
+      return JSON.stringify({
+        status: 'running',
+        model: 'anthropic/claude-sonnet-4-6',
+        startedAt: new Date(Date.now() - 600000).toISOString(),
+      });
+    }
+    return '{}';
+  });
   return {
     ...actual,
     default: {
@@ -67,23 +77,21 @@ vi.mock('fs', async () => {
         if (typeof p === 'string' && p.includes('cooldown')) return false;
         return false;
       }),
-      readdirSync: vi.fn((p: string) => {
-        if (typeof p === 'string' && p.includes('test-results')) return ['stuck-task.json'];
-        return [];
-      }),
-      readFileSync: vi.fn((p: string) => {
-        if (typeof p === 'string' && p.includes('stuck-task.json')) {
-          return JSON.stringify({
-            status: 'running',
-            model: 'anthropic/claude-sonnet-4-6',
-            startedAt: new Date(Date.now() - 600000).toISOString(), // started 10min ago (past grace)
-          });
-        }
-        return '{}';
-      }),
+      readFileSync: vi.fn(() => '{}'),
       writeFileSync: vi.fn(),
       appendFileSync: vi.fn(),
       mkdirSync: vi.fn(),
+      promises: {
+        readdir: vi.fn(async (p: string) => {
+          if (typeof p === 'string' && p.includes('test-results')) return ['stuck-task.json'];
+          return [];
+        }),
+        readFile: readFileMock,
+        writeFile: vi.fn(async () => {}),
+        appendFile: vi.fn(async () => {}),
+        mkdir: vi.fn(async () => {}),
+        access: vi.fn(async () => {}),
+      },
     },
   };
 });
@@ -122,7 +130,7 @@ describe('Stuck Task Recovery', () => {
 
   it('skips recovery for tasks within grace period', async () => {
     const fs = await import('fs');
-    (fs.default.readFileSync as any).mockImplementation((p: string) => {
+    (fs.default.promises.readFile as any).mockImplementation(async (p: string) => {
       if (typeof p === 'string' && p.includes('stuck-task.json')) {
         return JSON.stringify({
           status: 'running',
@@ -137,9 +145,8 @@ describe('Stuck Task Recovery', () => {
     expect(mockSpawnAgent).not.toHaveBeenCalled();
   });
 
-  it('manualRecover triggers recovery for a task', () => {
-    // First need to populate _loadResultsIndex
-    const result = engine.manualRecover('stuck-task');
+  it('manualRecover triggers recovery for a task', async () => {
+    const result = await engine.manualRecover('stuck-task');
     expect(result.ok).toBe(true);
   });
 });

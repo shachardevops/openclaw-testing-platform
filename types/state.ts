@@ -40,7 +40,6 @@ export interface DashboardState {
   pollStatus: string;
   gatewayStatus: GatewayStatus;
   streamingText: Record<string, string>;
-  sessions: unknown[];
 }
 
 export type DashboardAction =
@@ -63,8 +62,7 @@ export type DashboardAction =
   | { type: 'SET_GATEWAY_STATUS'; status: GatewayStatus }
   | { type: 'SET_STREAMING_TEXT'; taskId: string; text: string }
   | { type: 'APPEND_STREAMING_TEXT'; taskId: string; text: string }
-  | { type: 'CLEAR_STREAMING_TEXT'; taskId: string }
-  | { type: 'SET_SESSIONS'; sessions: unknown[] };
+  | { type: 'CLEAR_STREAMING_TEXT'; taskId: string };
 
 export interface DashboardContextValue extends DashboardState {
   allPipelines: CustomPipeline[];

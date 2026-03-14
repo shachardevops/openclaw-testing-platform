@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         if (!data.taskId) {
           result = { ok: false, error: 'Missing taskId' };
         } else {
-          result = orchestratorEngine.manualRecover(data.taskId);
+          result = await orchestratorEngine.manualRecover(data.taskId);  // async: reads results index
         }
         break;
 
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
         if (!data.id) {
           result = { ok: false, error: 'Missing confirmation id' };
         } else {
-          result = orchestratorEngine.confirmAction(data.id);
+          result = await orchestratorEngine.confirmAction(data.id);
         }
         break;
 

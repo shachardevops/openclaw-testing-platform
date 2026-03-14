@@ -61,25 +61,25 @@ function loadEngineConfig() {
 
 const COOLDOWN_DIR = path.join(resultsDir(), '.orchestrator-cooldowns');
 
-function _readFsCooldown(taskId: string): { at?: number; attempts?: number } | null {
+async function _readFsCooldown(taskId: string): Promise<{ at?: number; attempts?: number } | null> {
   try {
     const file = path.join(COOLDOWN_DIR, `${taskId}.json`);
-    if (!fs.existsSync(file)) return null;
-    return JSON.parse(fs.readFileSync(file, 'utf8'));
+    const raw = await fs.promises.readFile(file, 'utf8');
+    return JSON.parse(raw);
   } catch { return null; }
 }
 
-function _writeFsCooldown(taskId: string, data: { at: number; attempts: number }): void {
+async function _writeFsCooldown(taskId: string, data: { at: number; attempts: number }): Promise<void> {
   try {
-    if (!fs.existsSync(COOLDOWN_DIR)) fs.mkdirSync(COOLDOWN_DIR, { recursive: true });
-    fs.writeFileSync(path.join(COOLDOWN_DIR, `${taskId}.json`), JSON.stringify(data));
+    await fs.promises.mkdir(COOLDOWN_DIR, { recursive: true });
+    await fs.promises.writeFile(path.join(COOLDOWN_DIR, `${taskId}.json`), JSON.stringify(data));
   } catch { /* best-effort */ }
 }
 
-function _clearFsCooldown(taskId: string): void {
+async function _clearFsCooldown(taskId: string): Promise<void> {
   try {
     const file = path.join(COOLDOWN_DIR, `${taskId}.json`);
-    if (fs.existsSync(file)) fs.rmSync(file, { force: true });
+    await fs.promises.rm(file, { force: true });
   } catch { /* best-effort */ }
 }
 
@@ -127,28 +127,27 @@ interface DecisionMemoryEntry { action: string; reason: string; learnedAt: strin
 class DecisionMemory {
   private _memoryFile: string;
   private _cache: Map<string, DecisionMemoryEntry> = new Map();
-  constructor(memoryFilePath: string) { this._memoryFile = memoryFilePath; this._load(); }
-  private _load(): void {
+  constructor(memoryFilePath: string) { this._memoryFile = memoryFilePath; this._load().catch(() => { /* fresh start */ }); }
+  private async _load(): Promise<void> {
     try {
-      if (fs.existsSync(this._memoryFile)) {
-        const data = JSON.parse(fs.readFileSync(this._memoryFile, 'utf8'));
-        if (data.patterns) { for (const [key, val] of Object.entries(data.patterns)) { this._cache.set(key, val as DecisionMemoryEntry); } }
-      }
+      const raw = await fs.promises.readFile(this._memoryFile, 'utf8');
+      const data = JSON.parse(raw);
+      if (data.patterns) { for (const [key, val] of Object.entries(data.patterns)) { this._cache.set(key, val as DecisionMemoryEntry); } }
     } catch (e: unknown) { console.warn('[OrchestratorEngine] Failed to load decision memory:', (e as Error).message); }
   }
   lookup(patternKey: string): DecisionMemoryEntry | null { return this._cache.get(patternKey) || null; }
   store(patternKey: string, action: string, reason: string): void {
     this._cache.set(patternKey, { action, reason, learnedAt: new Date().toISOString(), usedCount: 0 });
-    this._persist();
+    this._persist().catch(() => { /* best-effort */ });
   }
-  incrementUsage(patternKey: string): void { const e = this._cache.get(patternKey); if (e) { e.usedCount = (e.usedCount || 0) + 1; this._persist(); } }
-  private _persist(): void {
+  incrementUsage(patternKey: string): void { const e = this._cache.get(patternKey); if (e) { e.usedCount = (e.usedCount || 0) + 1; this._persist().catch(() => { /* best-effort */ }); } }
+  private async _persist(): Promise<void> {
     try {
       const dir = path.dirname(this._memoryFile);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await fs.promises.mkdir(dir, { recursive: true });
       const patterns: Record<string, DecisionMemoryEntry> = {};
       for (const [key, val] of this._cache) patterns[key] = val;
-      fs.writeFileSync(this._memoryFile, JSON.stringify({ patterns }, null, 2) + '\n');
+      await fs.promises.writeFile(this._memoryFile, JSON.stringify({ patterns }, null, 2) + '\n');
     } catch (e: unknown) { console.warn('[OrchestratorEngine] Failed to persist decision memory:', (e as Error).message); }
   }
   get size(): number { return this._cache.size; }
@@ -185,6 +184,7 @@ class OrchestratorEngine {
   private _previousSessionIds: Set<string> = new Set();
   private _autonomyLevel: number = 3;
   private _pendingConfirmations: PendingConfirmation[] = [];
+  private _cachedDecisionTree: any = { nodes: [], thresholds: {} };
 
   get autonomyLevel(): number { return this._autonomyLevel; }
 
@@ -214,14 +214,14 @@ class OrchestratorEngine {
     return false;
   }
 
-  confirmAction(confirmationId: string): Record<string, any> {
+  async confirmAction(confirmationId: string): Promise<Record<string, any>> {
     const idx = this._pendingConfirmations.findIndex(c => c.id === confirmationId);
     if (idx === -1) return { ok: false, error: 'Confirmation not found' };
     const conf = this._pendingConfirmations.splice(idx, 1)[0];
     conf.status = 'confirmed';
     this._logDecision('manual', conf.context?.conditionType || 'unknown', conf.context?.target || 'unknown',
       conf.actionType, `Confirmed by operator (was autonomy-blocked)`);
-    return this._executeConfirmedAction(conf);
+    return await this._executeConfirmedAction(conf);
   }
 
   denyAction(confirmationId: string): Record<string, any> {
@@ -234,12 +234,12 @@ class OrchestratorEngine {
     return { ok: true };
   }
 
-  private _executeConfirmedAction(conf: PendingConfirmation): Record<string, any> {
+  private async _executeConfirmedAction(conf: PendingConfirmation): Promise<Record<string, any>> {
     switch (conf.actionType) {
       case 'nudge': return this.manualNudge(conf.context.sessionId);
       case 'swap': return this.manualSwap(conf.context.sessionId, conf.context.targetModel);
       case 'kill': return this.manualKill(conf.context.sessionId);
-      case 'recover': return this.manualRecover(conf.context.taskId);
+      case 'recover': return await this.manualRecover(conf.context.taskId);
       default: return { ok: false, error: `Unknown action type: ${conf.actionType}` };
     }
   }
@@ -287,7 +287,8 @@ class OrchestratorEngine {
     this._ticking = true;
     try {
       await this._evaluate();
-      this._runDriftCheck();
+      await this._runDriftCheck();
+      this._cachedDecisionTree = await this._buildDecisionTreeSnapshot();
     } catch (e: unknown) {
       console.error('[OrchestratorEngine] tick error:', (e as Error).message);
     } finally {
@@ -295,9 +296,9 @@ class OrchestratorEngine {
     }
   }
 
-  private _runDriftCheck(): void {
+  private async _runDriftCheck(): Promise<void> {
     try {
-      const resultsIndex = this._loadResultsIndex();
+      const resultsIndex = await this._loadResultsIndex();
       const activeTasks = Object.keys(resultsIndex).filter(id => resultsIndex[id]?.status === 'running');
       if (activeTasks.length === 0) return;
       for (const taskId of activeTasks) { driftDetector.recordCheckpoint(taskId, resultsIndex[taskId]); }
@@ -314,14 +315,14 @@ class OrchestratorEngine {
     const now = Date.now();
     if (appHealth.isHealthy() === false) return;
     const registry = sessionManager.registry;
-    const resultsIndex = this._loadResultsIndex();
+    const resultsIndex = await this._loadResultsIndex();
 
     for (const [taskId] of this._pendingTaskRecoveries) {
       const info = resultsIndex[taskId];
       if (!info || info.status !== 'running') {
         this._pendingTaskRecoveries.delete(taskId);
         this._conditionTracker.resolve('task_stuck', taskId);
-        _clearFsCooldown(taskId);
+        await _clearFsCooldown(taskId);
       }
     }
 
@@ -436,7 +437,7 @@ class OrchestratorEngine {
       if (hasSession) continue;
       if (info.startedAt && (now - info.startedAt) < cfg.taskStartGracePeriodMs) continue;
       this._conditionTracker.track('task_stuck', taskId);
-      let recoveryAttemptsSoFar = _readFsCooldown(taskId)?.attempts || 0;
+      let recoveryAttemptsSoFar = (await _readFsCooldown(taskId))?.attempts || 0;
       const pendingRecovery = this._pendingTaskRecoveries.get(taskId);
       if (pendingRecovery) {
         const pendingAge = now - pendingRecovery.attemptedAt;
@@ -448,25 +449,25 @@ class OrchestratorEngine {
         this._pendingTaskRecoveries.delete(taskId);
         if (recoveryAttemptsSoFar >= cfg.maxRecoveryAttempts) {
           this._logDecision('deterministic', 'task_stuck', taskId, 'auto-fail', `Recovery failed after ${recoveryAttemptsSoFar} attempts — auto-failing task`);
-          this._autoFailTask(taskId, info, recoveryAttemptsSoFar);
+          await this._autoFailTask(taskId, info, recoveryAttemptsSoFar);
           this._conditionTracker.resolve('task_stuck', taskId);
           continue;
         }
         this._logDecision('deterministic', 'task_stuck', taskId, 'recovery-timeout', `Recovery attempt ${recoveryAttemptsSoFar} timed out after ${formatAge(cfg.recoveryTimeoutMs)} — retrying`);
       }
       const lastRecovery = this._recoveryCooldowns.get(taskId) || 0;
-      const fsCooldown = _readFsCooldown(taskId);
+      const fsCooldown = await _readFsCooldown(taskId);
       const lastRecoveryEffective = Math.max(lastRecovery, fsCooldown?.at || 0);
       const cooldownElapsed = now - lastRecoveryEffective >= cfg.recoveryCooldownMs;
       if (cooldownElapsed && this._rateLimiter!.canSend() && this._canAutoExecute('recover', { conditionType: 'task_stuck', target: taskId, taskId })) {
         this._recoveryCooldowns.set(taskId, now);
-        const respawnMsg = this._respawnTask(taskId, info, cfg);
+        const respawnMsg = await this._respawnTask(taskId, info, cfg);
         if (respawnMsg) {
           this._stats.recoveries++;
           this._pendingTaskRecoveries.set(taskId, { attemptedAt: now, reason: 'auto-stuck-recovery', manual: false, attempts: recoveryAttemptsSoFar + 1 });
           this._logDecision('deterministic', 'task_stuck', taskId, 'respawn', `Respawning stuck task (attempt ${recoveryAttemptsSoFar + 1}/${cfg.maxRecoveryAttempts}, model: ${info.model})`, respawnMsg);
           this._rateLimiter!.record(); this._conditionTracker.markActioned('task_stuck', taskId, 'respawn');
-          _writeFsCooldown(taskId, { at: now, attempts: recoveryAttemptsSoFar + 1 });
+          await _writeFsCooldown(taskId, { at: now, attempts: recoveryAttemptsSoFar + 1 });
         } else {
           this._conditionTracker.resolve('task_stuck', taskId);
         }
@@ -476,7 +477,7 @@ class OrchestratorEngine {
     this._conditionTracker.prune(activeIds);
   }
 
-  private _respawnTask(taskId: string, resultInfo: Record<string, any>, cfg: any): string | null {
+  private async _respawnTask(taskId: string, resultInfo: Record<string, any>, cfg: any): Promise<string | null> {
     try {
       const sessions = listSessionsSync();
       const rsk = resultInfo.runSessionKey || '';
@@ -493,17 +494,17 @@ class OrchestratorEngine {
     if (!controllerSessionId) { console.warn('[OrchestratorEngine] No controller session — cannot respawn task', taskId); return null; }
     try {
       const logPath = bridgeLogPath();
-      fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] [engine] Respawning stuck task: ${taskId}\n`);
+      await fs.promises.appendFile(logPath, `\n[${new Date().toISOString()}] [engine] Respawning stuck task: ${taskId}\n`);
       spawnAgent(controllerSessionId, message, logPath);
       return message;
     } catch (e: unknown) { console.error('[OrchestratorEngine] Failed to respawn task:', taskId, (e as Error).message); return null; }
   }
 
-  private _autoFailTask(taskId: string, resultInfo: Record<string, any>, attemptCount: number): void {
+  private async _autoFailTask(taskId: string, resultInfo: Record<string, any>, attemptCount: number): Promise<void> {
     const resultsFile = path.join(resultsDir(), `${taskId}.json`);
     try {
       let data: any = {};
-      if (fs.existsSync(resultsFile)) { data = JSON.parse(fs.readFileSync(resultsFile, 'utf8')); }
+      try { data = JSON.parse(await fs.promises.readFile(resultsFile, 'utf8')); } catch { /* fresh data */ }
       data.status = 'failed';
       data.lastLog = `Recovery failed: ${attemptCount} respawn attempts timed out`;
       data.updatedAt = new Date().toISOString();
@@ -516,8 +517,8 @@ class OrchestratorEngine {
         });
       }
       data.findings = findings;
-      fs.writeFileSync(resultsFile, JSON.stringify(data, null, 2) + '\n');
-      try { const logPath = bridgeLogPath(); fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] [engine] Auto-failed task ${taskId} after ${attemptCount} recovery attempts\n`); } catch { /* best-effort */ }
+      await fs.promises.writeFile(resultsFile, JSON.stringify(data, null, 2) + '\n');
+      try { const logPath = bridgeLogPath(); await fs.promises.appendFile(logPath, `\n[${new Date().toISOString()}] [engine] Auto-failed task ${taskId} after ${attemptCount} recovery attempts\n`); } catch { /* best-effort */ }
     } catch (e: unknown) { console.error('[OrchestratorEngine] Failed to auto-fail task:', taskId, (e as Error).message); }
   }
 
@@ -584,9 +585,9 @@ class OrchestratorEngine {
     return result;
   }
 
-  manualRecover(taskId: string): Record<string, any> {
+  async manualRecover(taskId: string): Promise<Record<string, any>> {
     const cfg = loadEngineConfig();
-    const resultsIndex = this._loadResultsIndex();
+    const resultsIndex = await this._loadResultsIndex();
     const info = resultsIndex[taskId];
     if (!info) return { ok: false, error: `Task ${taskId} not found in results` };
     this._stats.recoveries++;
@@ -594,7 +595,7 @@ class OrchestratorEngine {
     this._recoveryCooldowns.set(taskId, now);
     this._pendingTaskRecoveries.set(taskId, { attemptedAt: now, reason: 'manual-recovery', manual: true, attempts: 1 });
     this._logDecision('manual', 'task_stuck', taskId, 'respawn', 'Manual recovery');
-    this._respawnTask(taskId, info, cfg);
+    await this._respawnTask(taskId, info, cfg);
     return { ok: true };
   }
 
@@ -605,14 +606,14 @@ class OrchestratorEngine {
     if (this._decisionLog.length > 200) this._decisionLog.length = 200;
   }
 
-  private _loadResultsIndex(): Record<string, any> {
+  private async _loadResultsIndex(): Promise<Record<string, any>> {
     const dir = resultsDir();
     const index: Record<string, any> = {};
     try {
-      const files = fs.readdirSync(dir).filter(f => f.endsWith('.json') && f !== 'system.json');
+      const files = (await fs.promises.readdir(dir)).filter(f => f.endsWith('.json') && f !== 'system.json');
       for (const file of files) {
         try {
-          const data = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+          const data = JSON.parse(await fs.promises.readFile(path.join(dir, file), 'utf8'));
           const taskId = file.replace('.json', '');
           index[taskId] = {
             status: data.status || 'idle', runSessionKey: data.runSessionKey || null,
@@ -637,14 +638,14 @@ class OrchestratorEngine {
       pendingConfirmations: [...this._pendingConfirmations],
       memorySize: this._decisionMemory?.size || 0,
       rateLimit: { remaining: this._rateLimiter?.remaining ?? 0, maxPerMinute: this._rateLimiter?.maxPerMinute ?? 6 },
-      decisionTree: this._buildDecisionTreeSnapshot(),
+      decisionTree: this._cachedDecisionTree,
     };
   }
 
-  private _buildDecisionTreeSnapshot() {
+  private async _buildDecisionTreeSnapshot() {
     const cfg = loadEngineConfig();
     const registry = sessionManager.registry;
-    const resultsIndex = this._loadResultsIndex();
+    const resultsIndex = await this._loadResultsIndex();
     const now = Date.now();
     const nodes: any[] = [];
 

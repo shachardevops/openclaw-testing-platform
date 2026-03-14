@@ -147,8 +147,7 @@ describe('Autonomy Levels', () => {
   });
 
   describe('confirmAction / denyAction', () => {
-    it('confirms a pending confirmation', () => {
-      // Access internal _pendingConfirmations to set up a pending action
+    it('confirms a pending confirmation', async () => {
       const conf = {
         id: 'conf-test-1',
         actionType: 'nudge',
@@ -158,17 +157,17 @@ describe('Autonomy Levels', () => {
       };
       (engine as any)._pendingConfirmations.push(conf);
 
-      const result = engine.confirmAction('conf-test-1');
+      const result = await engine.confirmAction('conf-test-1');
       expect(result.ok).toBe(true);
     });
 
-    it('returns error for nonexistent confirmation', () => {
-      const result = engine.confirmAction('nonexistent');
+    it('returns error for nonexistent confirmation', async () => {
+      const result = await engine.confirmAction('nonexistent');
       expect(result.ok).toBe(false);
       expect(result.error).toContain('not found');
     });
 
-    it('denies a pending confirmation', () => {
+    it('denies a pending confirmation', async () => {
       const conf = {
         id: 'conf-test-2',
         actionType: 'kill',
@@ -178,7 +177,7 @@ describe('Autonomy Levels', () => {
       };
       (engine as any)._pendingConfirmations.push(conf);
 
-      const result = engine.denyAction('conf-test-2');
+      const result = await engine.denyAction('conf-test-2');
       expect(result.ok).toBe(true);
       expect((engine as any)._pendingConfirmations).toHaveLength(0);
     });

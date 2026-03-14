@@ -54,17 +54,16 @@ class PatternStore {
 
   constructor(filePath: string) {
     this._file = filePath;
-    this._load();
+    this._load().catch(() => { /* fresh start */ });
   }
 
-  private _load(): void {
+  private async _load(): Promise<void> {
     try {
-      if (fs.existsSync(this._file)) {
-        const data = JSON.parse(fs.readFileSync(this._file, 'utf8'));
-        if (data.patterns) {
-          for (const [key, val] of Object.entries(data.patterns)) {
-            this._patterns.set(key, val as PatternData);
-          }
+      const raw = await fs.promises.readFile(this._file, 'utf8');
+      const data = JSON.parse(raw);
+      if (data.patterns) {
+        for (const [key, val] of Object.entries(data.patterns)) {
+          this._patterns.set(key, val as PatternData);
         }
       }
     } catch { /* fresh start */ }
@@ -95,7 +94,7 @@ class PatternStore {
       this._evict(maxPatterns);
     }
 
-    this._persist();
+    this._persist().catch(() => { /* best-effort */ });
   }
 
   retrieve(key: string): PatternData | null {
@@ -131,15 +130,15 @@ class PatternStore {
     this._patterns = new Map(entries.slice(0, maxSize));
   }
 
-  private _persist(): void {
+  private async _persist(): Promise<void> {
     try {
       const dir = path.dirname(this._file);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      await fs.promises.mkdir(dir, { recursive: true });
       const patterns: Record<string, PatternData> = {};
       for (const [key, val] of this._patterns) {
         patterns[key] = val;
       }
-      fs.writeFileSync(this._file, JSON.stringify({
+      await fs.promises.writeFile(this._file, JSON.stringify({
         version: 1,
         updatedAt: new Date().toISOString(),
         totalPatterns: this._patterns.size,
@@ -169,15 +168,14 @@ class ModelStatsTracker {
 
   constructor(filePath: string) {
     this._file = filePath;
-    this._load();
+    this._load().catch(() => { /* fresh start */ });
   }
 
-  private _load(): void {
+  private async _load(): Promise<void> {
     try {
-      if (fs.existsSync(this._file)) {
-        const data = JSON.parse(fs.readFileSync(this._file, 'utf8'));
-        this._stats = data.models || {};
-      }
+      const raw = await fs.promises.readFile(this._file, 'utf8');
+      const data = JSON.parse(raw);
+      this._stats = data.models || {};
     } catch { /* fresh start */ }
   }
 
@@ -210,7 +208,7 @@ class ModelStatsTracker {
     s.passRate = s.runs > 0 ? Math.round((s.passed / s.runs) * 100) : 0;
     s.avgDurationMs = s.runs > 0 ? Math.round(s.totalDurationMs / s.runs) : 0;
 
-    this._persist();
+    this._persist().catch(() => { /* best-effort */ });
   }
 
   getStats(): Record<string, ModelStats> {
@@ -229,11 +227,11 @@ class ModelStatsTracker {
     return best ? { modelId: best, ...this._stats[best] } : null;
   }
 
-  private _persist(): void {
+  private async _persist(): Promise<void> {
     try {
       const dir = path.dirname(this._file);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this._file, JSON.stringify({
+      await fs.promises.mkdir(dir, { recursive: true });
+      await fs.promises.writeFile(this._file, JSON.stringify({
         version: 1,
         updatedAt: new Date().toISOString(),
         models: this._stats,
@@ -265,7 +263,7 @@ class LearningLoop {
     this._modelStats = new ModelStatsTracker(path.join(memDir, 'model-stats.json'));
   }
 
-  learnFromResult(taskId: string, result: Record<string, any>, reportsDir?: string): void {
+  async learnFromResult(taskId: string, result: Record<string, any>, reportsDir?: string): Promise<void> {
     const config = loadLearningConfig();
     if (!config.enabled || !config.learnFromResults) return;
     this._ensureInit();
@@ -277,19 +275,17 @@ class LearningLoop {
     if (reportsDir) {
       try {
         const reportPath = path.join(reportsDir, `${taskId}.md`);
-        if (fs.existsSync(reportPath)) {
-          const md = fs.readFileSync(reportPath, 'utf8');
-          const findings = parseFindingsFromReport(md);
-          for (const finding of findings) {
-            const patternKey = `bug:${finding.id}`;
-            this._patterns!.observe(patternKey, {
-              type: 'bug',
-              category: finding.severity,
-              title: finding.title,
-              taskId,
-              context: { model: result.model, status: result.status },
-            });
-          }
+        const md = await fs.promises.readFile(reportPath, 'utf8');
+        const findings = parseFindingsFromReport(md);
+        for (const finding of findings) {
+          const patternKey = `bug:${finding.id}`;
+          this._patterns!.observe(patternKey, {
+            type: 'bug',
+            category: finding.severity,
+            title: finding.title,
+            taskId,
+            context: { model: result.model, status: result.status },
+          });
         }
       } catch { /* best-effort */ }
     }

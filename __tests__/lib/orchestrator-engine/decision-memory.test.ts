@@ -40,12 +40,18 @@ describe('DecisionMemory', () => {
     expect(entry!.usedCount).toBe(2);
   });
 
-  it('persists to disk and reloads', () => {
+  it('persists to disk and reloads', async () => {
     memory.store('pattern:a', 'kill', 'reason-a');
     memory.store('pattern:b', 'swap', 'reason-b');
 
+    // Wait for async persist to complete
+    await new Promise(r => setTimeout(r, 50));
+
     // Create a new instance from the same file
     const reloaded = new DecisionMemory(memoryFile);
+    // Wait for async load to complete
+    await new Promise(r => setTimeout(r, 50));
+
     expect(reloaded.lookup('pattern:a')!.action).toBe('kill');
     expect(reloaded.lookup('pattern:b')!.action).toBe('swap');
   });
