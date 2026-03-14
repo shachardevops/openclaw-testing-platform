@@ -91,7 +91,7 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
       }
     }
 
-    // Advance pipeline on task completion
+    // Advance pipeline on task completion (with quality gate check)
     const ap = activePipelineRef.current;
     if (ap.pipelineId && ap.currentTaskId) {
       const prevSt = prevResultsRef.current[ap.currentTaskId]?.status;
@@ -99,6 +99,26 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
       if (nextSt && (nextSt === 'passed' || nextSt === 'failed') && nextSt !== prevSt) {
         const t = TASKS.find(x => x.id === ap.currentTaskId);
         addLog('PIPELINE', `Done S${t?.num ?? '?'}: ${nextSt.toUpperCase()}`, nextSt === 'failed' ? 'error' : 'success');
+
+        // Quality gate check via API (non-blocking — warn-only by default)
+        fetch('/api/quality-gates', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'evaluate', taskId: ap.currentTaskId, result: results[ap.currentTaskId] }),
+        }).then(r => r.json()).then(data => {
+          if (data?.ok && !data.passed && data.violations?.length > 0) {
+            const vMsgs = data.violations.map(v => `[${v.rule}] ${v.message}`).join('; ');
+            addLog('GATE', `Quality gate ${data.action === 'blocked' ? 'BLOCKED' : 'WARNING'}: ${vMsgs}`, data.action === 'blocked' ? 'error' : '');
+          }
+        }).catch(() => { /* quality gate API unavailable — continue */ });
+
+        // Notify learning loop of task completion
+        fetch('/api/learning-loop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'learn-result', taskId: ap.currentTaskId, result: results[ap.currentTaskId] }),
+        }).catch(() => { /* learning loop unavailable — continue */ });
+
         const fin = new Set(ap.finished);
         fin.add(ap.currentTaskId);
         const newAp = { currentTaskId: null, finished: fin };

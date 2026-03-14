@@ -86,6 +86,30 @@ export async function POST(request) {
         }
         break;
 
+      case 'set-autonomy-level':
+        if (data.level === undefined) {
+          result = { ok: false, error: 'Missing level (0-4)' };
+        } else {
+          result = orchestratorEngine.setAutonomyLevel(data.level);
+        }
+        break;
+
+      case 'confirm-action':
+        if (!data.id) {
+          result = { ok: false, error: 'Missing confirmation id' };
+        } else {
+          result = orchestratorEngine.confirmAction(data.id);
+        }
+        break;
+
+      case 'deny-action':
+        if (!data.id) {
+          result = { ok: false, error: 'Missing confirmation id' };
+        } else {
+          result = orchestratorEngine.denyAction(data.id);
+        }
+        break;
+
       default:
         result = { ok: false, error: `Unknown action: ${action}` };
     }

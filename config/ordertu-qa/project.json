@@ -24,10 +24,31 @@
   },
   "orchestrator": {
     "enabled": true,
+    "autonomyLevel": 3,
     "recoveryCooldownMs": 120000,
     "maxControllerMessagesPerMinute": 6,
     "aiConsultationEnabled": true,
     "decisionMemoryFile": "memory/decision-memory.json"
+  },
+  "qualityGates": {
+    "enabled": true,
+    "enforceOnPipeline": true,
+    "enforceOnFinalize": false,
+    "failAction": "warn",
+    "rules": {
+      "minPassRate": 0,
+      "maxP1Bugs": 3,
+      "maxFailures": 50,
+      "requireReport": true
+    }
+  },
+  "learningLoop": {
+    "enabled": true,
+    "learnFromResults": true,
+    "learnFromOrchestrator": true,
+    "trackModelPerformance": true,
+    "maxPatterns": 500,
+    "consolidationThreshold": 3
   },
   "modelFallback": {
     "enabled": true,
