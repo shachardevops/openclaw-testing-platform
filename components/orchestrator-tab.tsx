@@ -1,7 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useOrchestrator } from '@/hooks/use-orchestrator';
+
+interface Decision {
+  ts: string;
+  source: string;
+  action: string;
+  reason: string;
+  target?: string;
+  message?: string;
+}
+
+interface Condition {
+  type: string;
+  id?: string;
+  count: number;
+  firstSeen?: number;
+  actionTaken?: string;
+}
+
+interface Recommendation {
+  id: string;
+  action: string;
+  patternKey: string;
+  reason: string;
+  description?: string;
+}
+
+interface TreeNode {
+  sessionId?: string;
+  taskId?: string;
+  key?: string;
+  status: string;
+  ageMs?: number;
+  model?: string;
+  level?: number;
+  nudgeCount?: number;
+  swapCount?: number;
+  progress?: number;
+  nextAction?: string;
+}
+
+interface Thresholds {
+  staleMs?: number;
+  swapMs?: number;
+  killMs?: number;
+  recoveryCooldownMs?: number;
+  orphanMs?: number;
+}
 
 const SOURCE_COLORS: Record<string, string> = {
   deterministic: 'text-blue-400',
@@ -21,7 +68,7 @@ const SOURCE_BG: Record<string, string> = {
   rejected: 'bg-red-400/5',
 };
 
-function formatTime(ts: number | string | undefined) {
+function formatTime(ts: string | number | undefined) {
   if (!ts) return '';
   return new Date(ts).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
@@ -42,12 +89,7 @@ function formatMs(ms: number | undefined) {
   return `${Math.round(ms / 60000)}m`;
 }
 
-interface StatusBadgeOrcProps {
-  started: boolean;
-  paused: boolean;
-}
-
-function StatusBadgeOrc({ started, paused }: StatusBadgeOrcProps) {
+function StatusBadge({ started, paused }: { started: boolean; paused: boolean }) {
   if (!started) {
     return (
       <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wide text-zinc-500">
@@ -72,13 +114,7 @@ function StatusBadgeOrc({ started, paused }: StatusBadgeOrcProps) {
   );
 }
 
-interface StatPillProps {
-  label: string;
-  value: number;
-  color: string;
-}
-
-function StatPill({ label, value, color }: StatPillProps) {
+function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
   return (
     <span className={`font-mono text-[10px] px-2 py-0.5 rounded ${value > 0 ? color : 'text-zinc-600 bg-zinc-800/30'}`}>
       {value} {label}
@@ -94,7 +130,7 @@ export default function OrchestratorTab() {
     approveRecommendation, rejectRecommendation,
   } = useOrchestrator();
 
-  const [panel, setPanel] = useState('tree');
+  const [panel, setPanel] = useState<'tree' | 'decisions' | 'conditions' | 'manual'>('tree');
   const [expandedDecisions, setExpandedDecisions] = useState<Set<string>>(new Set());
   const [manualAction, setManualAction] = useState('nudge');
   const [manualTarget, setManualTarget] = useState('');
@@ -125,7 +161,7 @@ export default function OrchestratorTab() {
       {/* Header bar */}
       <div className="px-4 py-2 border-b border-border bg-card/20 flex items-center gap-3 shrink-0">
         <span className="font-mono text-[11px] text-zinc-200 font-medium">Decision Engine</span>
-        <StatusBadgeOrc started={started} paused={paused} />
+        <StatusBadge started={started} paused={paused} />
 
         <span className="font-mono text-[9px] text-zinc-600">
           {rateLimit.remaining}/{rateLimit.maxPerMinute} msgs/min
@@ -173,20 +209,20 @@ export default function OrchestratorTab() {
             Pending Review ({pendingReview.length})
           </div>
           <div className="space-y-1.5 max-h-[120px] overflow-y-auto">
-            {pendingReview.map((rec: Record<string, unknown>) => (
-              <div key={rec.id as string} className="flex items-center gap-2 font-mono text-[10px]">
-                <span className="text-purple-400 shrink-0">{rec.action as string}</span>
-                <span className="text-zinc-400 truncate flex-1" title={rec.description as string}>
-                  {rec.patternKey as string}: {rec.reason as string}
+            {pendingReview.map((rec: Recommendation) => (
+              <div key={rec.id} className="flex items-center gap-2 font-mono text-[10px]">
+                <span className="text-purple-400 shrink-0">{rec.action}</span>
+                <span className="text-zinc-400 truncate flex-1" title={rec.description}>
+                  {rec.patternKey}: {rec.reason}
                 </span>
                 <button
-                  onClick={() => approveRecommendation(rec.id as string)}
+                  onClick={() => approveRecommendation(rec.id)}
                   className="text-[9px] text-green-400 hover:text-green-200 bg-green-950/40 border border-green-900/30 rounded px-1.5 py-0.5"
                 >
                   Approve
                 </button>
                 <button
-                  onClick={() => rejectRecommendation(rec.id as string)}
+                  onClick={() => rejectRecommendation(rec.id)}
                   className="text-[9px] text-red-400 hover:text-red-200 bg-red-950/40 border border-red-900/30 rounded px-1.5 py-0.5"
                 >
                   Reject
@@ -234,7 +270,7 @@ export default function OrchestratorTab() {
               No decisions yet — engine is monitoring...
             </div>
           ) : (
-            recentDecisions.map((d: Record<string, unknown>, i: number) => {
+            recentDecisions.map((d: Decision, i: number) => {
               const key = `${d.ts}-${i}`;
               const isExpanded = expandedDecisions.has(key);
               const hasMessage = !!d.message;
@@ -250,17 +286,17 @@ export default function OrchestratorTab() {
               return (
                 <div key={key}>
                   <div
-                    className={`px-3 py-1.5 flex gap-2 border-b border-zinc-900/30 items-start hover:bg-zinc-800/20 ${SOURCE_BG[d.source as string] || ''} ${hasMessage ? 'cursor-pointer' : ''}`}
+                    className={`px-3 py-1.5 flex gap-2 border-b border-zinc-900/30 items-start hover:bg-zinc-800/20 ${SOURCE_BG[d.source] || ''} ${hasMessage ? 'cursor-pointer' : ''}`}
                     onClick={toggleExpand}
                   >
-                    <span className="text-zinc-600 shrink-0 w-16">{formatTime(d.ts as number)}</span>
-                    <span className={`shrink-0 w-20 uppercase tracking-wide ${SOURCE_COLORS[d.source as string] || 'text-zinc-400'}`}>
-                      {d.source as string}
+                    <span className="text-zinc-600 shrink-0 w-16">{formatTime(d.ts)}</span>
+                    <span className={`shrink-0 w-20 uppercase tracking-wide ${SOURCE_COLORS[d.source] || 'text-zinc-400'}`}>
+                      {d.source}
                     </span>
-                    <span className="shrink-0 w-14 text-zinc-500 uppercase">{d.action as string}</span>
-                    <span className="text-zinc-400 truncate flex-1" title={d.reason as string}>{d.reason as string}</span>
-                    <span className="text-zinc-600 shrink-0 truncate max-w-[100px]" title={d.target as string}>
-                      {typeof d.target === 'string' ? (d.target as string).slice(0, 12) : ''}
+                    <span className="shrink-0 w-14 text-zinc-500 uppercase">{d.action}</span>
+                    <span className="text-zinc-400 truncate flex-1" title={d.reason}>{d.reason}</span>
+                    <span className="text-zinc-600 shrink-0 truncate max-w-[100px]" title={d.target}>
+                      {typeof d.target === 'string' ? d.target.slice(0, 12) : ''}
                     </span>
                     {hasMessage && (
                       <span className="text-zinc-600 shrink-0 text-[9px]">{isExpanded ? '\u25BC' : '\u25B6'}</span>
@@ -268,7 +304,7 @@ export default function OrchestratorTab() {
                   </div>
                   {isExpanded && d.message && (
                     <div className="px-3 py-2 border-b border-zinc-900/30 bg-zinc-900/40">
-                      <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">{d.message as string}</pre>
+                      <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">{d.message}</pre>
                     </div>
                   )}
                 </div>
@@ -294,15 +330,15 @@ export default function OrchestratorTab() {
                 <span>Age</span>
                 <span>Action Taken</span>
               </div>
-              {activeConditions.map((c: Record<string, unknown>, i: number) => (
+              {activeConditions.map((c: Condition, i: number) => (
                 <div key={`${c.type}-${c.id}-${i}`} className="grid grid-cols-[100px_120px_80px_80px_1fr] gap-1 px-3 py-1.5 border-b border-zinc-900/30 items-center hover:bg-zinc-800/20">
-                  <span className="text-amber-400 uppercase">{c.type as string}</span>
-                  <span className="text-zinc-300 truncate" title={c.id as string}>{(c.id as string)?.slice(0, 16)}</span>
-                  <span className="text-zinc-500">{c.count as number}x</span>
+                  <span className="text-amber-400 uppercase">{c.type}</span>
+                  <span className="text-zinc-300 truncate" title={c.id}>{c.id?.slice(0, 16)}</span>
+                  <span className="text-zinc-500">{c.count}x</span>
                   <span className="text-zinc-500">
-                    {c.firstSeen ? `${Math.round((Date.now() - (c.firstSeen as number)) / 1000)}s` : '?'}
+                    {c.firstSeen ? `${Math.round((Date.now() - c.firstSeen) / 1000)}s` : '?'}
                   </span>
-                  <span className="text-zinc-400">{(c.actionTaken as string) || '\u2014'}</span>
+                  <span className="text-zinc-400">{c.actionTaken || '\u2014'}</span>
                 </div>
               ))}
             </>
@@ -321,7 +357,7 @@ export default function OrchestratorTab() {
               <label className="font-mono text-[9px] text-zinc-500 uppercase">Action</label>
               <select
                 value={manualAction}
-                onChange={(e) => setManualAction(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setManualAction(e.target.value)}
                 className="bg-[#0a0a12] border border-border rounded px-2 py-1.5 text-[11px] text-zinc-200 font-mono"
               >
                 <option value="nudge">Nudge</option>
@@ -336,7 +372,7 @@ export default function OrchestratorTab() {
               </label>
               <input
                 value={manualTarget}
-                onChange={(e) => setManualTarget(e.target.value)}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualTarget(e.target.value)}
                 placeholder={manualAction === 'recover' ? 'task-id...' : 'session-id...'}
                 className="w-full bg-[#0a0a12] border border-border rounded px-2 py-1.5 text-[11px] text-zinc-200 font-mono placeholder:text-zinc-600"
               />
@@ -346,7 +382,7 @@ export default function OrchestratorTab() {
                 <label className="font-mono text-[9px] text-zinc-500 uppercase">Target Model</label>
                 <input
                   value={manualModel}
-                  onChange={(e) => setManualModel(e.target.value)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setManualModel(e.target.value)}
                   placeholder="anthropic/claude-sonnet-4-6"
                   className="bg-[#0a0a12] border border-border rounded px-2 py-1.5 text-[11px] text-zinc-200 font-mono placeholder:text-zinc-600 w-60"
                 />
@@ -368,12 +404,16 @@ export default function OrchestratorTab() {
 
 // ── Decision Tree View ──────────
 
-interface DecisionTreeViewProps {
-  nodes: Record<string, unknown>[];
-  thresholds: Record<string, number>;
+interface ColorSet {
+  line: string;
+  dot: string;
+  text: string;
+  labelBg: string;
+  nodeBg: string;
+  nodeBorder: string;
 }
 
-function DecisionTreeView({ nodes, thresholds }: DecisionTreeViewProps) {
+function DecisionTreeView({ nodes, thresholds }: { nodes: TreeNode[]; thresholds: Thresholds }) {
   const healthy = nodes.filter(n => n.status === 'healthy');
   const stale = nodes.filter(n => n.status === 'stale');
   const stuck = nodes.filter(n => n.status === 'stuck');
@@ -381,14 +421,14 @@ function DecisionTreeView({ nodes, thresholds }: DecisionTreeViewProps) {
   const duplicate = nodes.filter(n => n.status === 'duplicate');
 
   const branches = [
-    { key: 'healthy', label: 'Healthy', nodes: healthy, color: 'green', action: `Monitor \u2192 Nudge @ ${formatMs(thresholds?.staleMs)}` },
-    { key: 'stale', label: 'Stale', nodes: stale, color: 'amber', action: `Nudge \u2192 Swap @ ${formatMs(thresholds?.swapMs)} \u2192 Kill @ ${formatMs(thresholds?.killMs)}` },
-    { key: 'stuck', label: 'Stuck (no session)', nodes: stuck, color: 'red', action: `Respawn (cooldown ${formatMs(thresholds?.recoveryCooldownMs)})` },
-    { key: 'orphaned', label: 'Orphaned', nodes: orphaned, color: 'zinc', action: `Purge @ ${formatMs(thresholds?.orphanMs)}` },
-    { key: 'duplicate', label: 'Duplicate', nodes: duplicate, color: 'purple', action: 'Auto-kill older' },
+    { key: 'healthy', label: 'Healthy', nodes: healthy, color: 'green' as const, action: `Monitor \u2192 Nudge @ ${formatMs(thresholds?.staleMs)}` },
+    { key: 'stale', label: 'Stale', nodes: stale, color: 'amber' as const, action: `Nudge \u2192 Swap @ ${formatMs(thresholds?.swapMs)} \u2192 Kill @ ${formatMs(thresholds?.killMs)}` },
+    { key: 'stuck', label: 'Stuck (no session)', nodes: stuck, color: 'red' as const, action: `Respawn (cooldown ${formatMs(thresholds?.recoveryCooldownMs)})` },
+    { key: 'orphaned', label: 'Orphaned', nodes: orphaned, color: 'zinc' as const, action: `Purge @ ${formatMs(thresholds?.orphanMs)}` },
+    { key: 'duplicate', label: 'Duplicate', nodes: duplicate, color: 'purple' as const, action: 'Auto-kill older' },
   ].filter(b => b.nodes.length > 0);
 
-  const colorMap: Record<string, Record<string, string>> = {
+  const colorMap: Record<string, ColorSet> = {
     green: { line: 'border-green-500/40', dot: 'bg-green-400', text: 'text-green-400', labelBg: 'bg-green-500/10', nodeBg: 'bg-green-500/5', nodeBorder: 'border-green-500/20' },
     amber: { line: 'border-amber-500/40', dot: 'bg-amber-400', text: 'text-amber-400', labelBg: 'bg-amber-500/10', nodeBg: 'bg-amber-500/5', nodeBorder: 'border-amber-500/20' },
     red: { line: 'border-red-500/40', dot: 'bg-red-400', text: 'text-red-400', labelBg: 'bg-red-500/10', nodeBg: 'bg-red-500/5', nodeBorder: 'border-red-500/20' },
@@ -425,8 +465,9 @@ function DecisionTreeView({ nodes, thresholds }: DecisionTreeViewProps) {
               const isLastNode = ni === branch.nodes.length - 1;
               return (
                 <TreeLeafNode
-                  key={(node.sessionId as string) || (node.taskId as string) || ni}
+                  key={node.sessionId || node.taskId || ni}
                   node={node}
+                  thresholds={thresholds}
                   colors={c}
                   isLast={isLastNode}
                 />
@@ -441,25 +482,18 @@ function DecisionTreeView({ nodes, thresholds }: DecisionTreeViewProps) {
   );
 }
 
-interface TreeLeafNodeProps {
-  node: Record<string, unknown>;
-  colors: Record<string, string>;
-  isLast: boolean;
-}
-
-function TreeLeafNode({ node, colors, isLast }: TreeLeafNodeProps) {
+function TreeLeafNode({ node, colors, isLast }: { node: TreeNode; thresholds: Thresholds; colors: ColorSet; isLast: boolean }) {
   const shortKey = node.key
-    ? ((node.key as string).length > 28 ? (node.key as string).slice(0, 28) + '...' : node.key as string)
-    : (node.sessionId ? (node.sessionId as string).slice(0, 12) + '...' : 'no session');
+    ? (node.key.length > 28 ? node.key.slice(0, 28) + '...' : node.key)
+    : (node.sessionId ? node.sessionId.slice(0, 12) + '...' : 'no session');
 
   const escalationSteps: { label: string; name: string; done: boolean; active: boolean }[] = [];
   if (node.status === 'stale' || node.status === 'healthy') {
-    const level = (node.level as number) || 0;
     const steps = [
-      { label: 'L0', name: 'Monitor', done: level > 0, active: level === 0 },
-      { label: 'L1', name: 'Nudge', done: level > 1, active: level === 1 },
-      { label: 'L2', name: 'Swap', done: level > 2, active: level === 2 },
-      { label: 'L3', name: 'Kill', done: false, active: level >= 3 },
+      { label: 'L0', name: 'Monitor', done: (node.level ?? 0) > 0, active: (node.level ?? 0) === 0 },
+      { label: 'L1', name: 'Nudge', done: (node.level ?? 0) > 1, active: (node.level ?? 0) === 1 },
+      { label: 'L2', name: 'Swap', done: (node.level ?? 0) > 2, active: (node.level ?? 0) === 2 },
+      { label: 'L3', name: 'Kill', done: false, active: (node.level ?? 0) >= 3 },
     ];
     for (const s of steps) {
       escalationSteps.push(s);
@@ -469,7 +503,7 @@ function TreeLeafNode({ node, colors, isLast }: TreeLeafNodeProps) {
   return (
     <div className="flex items-stretch ml-[26px]">
       <div className="flex items-stretch shrink-0">
-        <div className="w-px">
+        <div className={`w-px`}>
           <div className={`w-full h-full ${isLast ? 'border-l-2 border-dashed' : 'border-l-2'} ${colors.line}`}
                style={isLast ? { height: '50%' } : {}} />
         </div>
@@ -480,19 +514,19 @@ function TreeLeafNode({ node, colors, isLast }: TreeLeafNodeProps) {
 
       <div className={`flex-1 my-1 border ${colors.nodeBorder} ${colors.nodeBg} rounded-md px-2.5 py-1.5`}>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-zinc-300 text-[10px] truncate max-w-[200px]" title={(node.key as string) || (node.sessionId as string)}>
+          <span className="text-zinc-300 text-[10px] truncate max-w-[200px]" title={node.key || node.sessionId}>
             {shortKey}
           </span>
           {node.taskId && (
             <>
               <span className="text-zinc-700">{'\u2192'}</span>
-              <span className="text-zinc-400 text-[10px]">{node.taskId as string}</span>
+              <span className="text-zinc-400 text-[10px]">{node.taskId}</span>
             </>
           )}
-          <span className="text-zinc-600 text-[9px]">{formatAge(node.ageMs as number)}</span>
+          <span className="text-zinc-600 text-[9px]">{formatAge(node.ageMs)}</span>
           {node.model && (
             <span className="text-zinc-600 text-[9px] ml-auto">
-              {(node.model as string).split('/').pop()?.slice(0, 16)}
+              {node.model.split('/').pop()?.slice(0, 16)}
             </span>
           )}
         </div>
@@ -513,21 +547,21 @@ function TreeLeafNode({ node, colors, isLast }: TreeLeafNodeProps) {
                 </span>
               </div>
             ))}
-            {(node.nudgeCount as number) > 0 && (
-              <span className="text-[8px] text-zinc-600 ml-1">{node.nudgeCount as number}N {node.swapCount as number}S</span>
+            {(node.nudgeCount ?? 0) > 0 && (
+              <span className="text-[8px] text-zinc-600 ml-1">{node.nudgeCount}N {node.swapCount}S</span>
             )}
           </div>
         )}
 
-        {(node.progress as number) > 0 && node.nextAction && node.nextAction !== 'monitoring' && node.nextAction !== 'killed' && (
+        {(node.progress ?? 0) > 0 && node.nextAction && node.nextAction !== 'monitoring' && node.nextAction !== 'killed' && (
           <div className="flex items-center gap-1.5 mt-1">
             <div className="flex-1 h-[3px] bg-zinc-800 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-1000 ${colors.dot}`}
-                style={{ width: `${Math.min(100, node.progress as number)}%` }}
+                style={{ width: `${Math.min(100, node.progress!)}%` }}
               />
             </div>
-            <span className="text-[8px] text-zinc-600 shrink-0">{node.nextAction as string}</span>
+            <span className="text-[8px] text-zinc-600 shrink-0">{node.nextAction}</span>
           </div>
         )}
       </div>
@@ -535,15 +569,9 @@ function TreeLeafNode({ node, colors, isLast }: TreeLeafNodeProps) {
   );
 }
 
-// ── Sub-component ──────────
+// ── Sub-component ──────────────────────────────────────────
 
-interface TabBtnProps {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}
-
-function TabBtn({ active, onClick, children }: TabBtnProps) {
+function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
     <button
       onClick={onClick}

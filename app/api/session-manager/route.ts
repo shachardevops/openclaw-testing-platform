@@ -47,19 +47,19 @@ export async function POST(request: NextRequest) {
         result = { ok: true, action: 'scan' };
         break;
       case 'nudge':
-        result = sessionManager.nudge(data.sessionId);
+        result = sessionManager.nudge(data.sessionId!);
         break;
       case 'swap':
-        result = sessionManager.swapModel(data.sessionId, data.targetModel);
+        result = sessionManager.swapModel(data.sessionId!, data.targetModel!);
         break;
       case 'kill':
-        result = sessionManager.killSession(data.sessionId);
+        result = sessionManager.killSession(data.sessionId!);
         break;
       case 'kill-orphans':
         result = sessionManager.killOrphans();
         break;
       case 'dedup':
-        result = sessionManager.dedup(data.taskId);
+        result = sessionManager.dedup(data.taskId!);
         break;
       case 'dedup-all':
         result = sessionManager.dedupAll();

@@ -1,9 +1,32 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useDashboard } from '@/context/dashboard-context';
 import { useProjectConfig } from '@/context/project-config-context';
 import { normalizeStatus } from '@/lib/normalize-status';
+
+interface Task {
+  id: string;
+  num: number;
+  title: string;
+  icon: string;
+  actor: string;
+  desc: string;
+  defaultModel?: string;
+  deps?: string[];
+}
+
+interface Model {
+  id: string;
+  short: string;
+}
+
+interface Skill {
+  id: string;
+  name: string;
+  icon: string;
+  description?: string;
+}
 
 const STATUS_DOT: Record<string, string> = {
   idle: 'bg-zinc-600',
@@ -24,19 +47,19 @@ export default function PipelineBuilder() {
   } = useDashboard();
   const { tasks: TASKS, models: MODELS, skills: SKILLS, project } = useProjectConfig();
 
-  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(() => new Set(TASKS.map(t => t.id)));
+  const [selectedTasks, setSelectedTasks] = useState<Set<string>>(() => new Set(TASKS.map((t: Task) => t.id)));
   const [globalModel, setGlobalModel] = useState(
-    () => MODELS.find(m => /sonnet/i.test(m.short))?.id || MODELS[0]?.id || ''
+    () => MODELS.find((m: Model) => /sonnet/i.test(m.short))?.id || MODELS[0]?.id || ''
   );
   const [selectedSkills, setSelectedSkills] = useState<Set<string>>(new Set());
 
   // TASKS loads async — default to all selected once available
-  const taskIdsKey = TASKS.map(t => t.id).join(',');
+  const taskIdsKey = TASKS.map((t: Task) => t.id).join(',');
   const [prevTaskIdsKey, setPrevTaskIdsKey] = useState(taskIdsKey);
   if (taskIdsKey !== prevTaskIdsKey) {
     setPrevTaskIdsKey(taskIdsKey);
     if (selectedTasks.size === 0 && TASKS.length > 0) {
-      setSelectedTasks(new Set(TASKS.map(t => t.id)));
+      setSelectedTasks(new Set(TASKS.map((t: Task) => t.id)));
     }
   }
 
@@ -52,7 +75,7 @@ export default function PipelineBuilder() {
     setSelectedSkills(next);
   };
 
-  const selectAll = () => setSelectedTasks(new Set(TASKS.map(t => t.id)));
+  const selectAll = () => setSelectedTasks(new Set(TASKS.map((t: Task) => t.id)));
   const selectNone = () => setSelectedTasks(new Set());
 
   // Stats
@@ -70,12 +93,10 @@ export default function PipelineBuilder() {
 
   const isRunning = activePipeline.pipelineId != null;
 
-  // Run selected tasks sequentially as a pipeline
   const handleRunPipeline = () => {
     if (selectedTasks.size === 0) return;
-    const taskIds = TASKS.filter(t => selectedTasks.has(t.id)).map(t => t.id);
+    const taskIds = TASKS.filter((t: Task) => selectedTasks.has(t.id)).map((t: Task) => t.id);
 
-    // Apply global model + skills to all selected tasks
     for (const tid of taskIds) {
       if (globalModel) setTaskModel(tid, globalModel);
       const current = getTaskSkills(tid);
@@ -84,11 +105,9 @@ export default function PipelineBuilder() {
       }
     }
 
-    // Run inline — no lookup needed, avoids race conditions
-    runInlinePipeline(taskIds);
+    runInlinePipeline(`Run ${taskIds.length} tasks`, taskIds);
   };
 
-  // Run single task with current global settings
   const handleRunSingle = (taskId: string) => {
     if (globalModel) setTaskModel(taskId, globalModel);
     const current = getTaskSkills(taskId);
@@ -127,8 +146,7 @@ export default function PipelineBuilder() {
         </div>
 
         <div className="px-2">
-          {TASKS.map(t => {
-            const taskAny = t as Record<string, unknown>;
+          {TASKS.map((t: Task) => {
             const d = results[t.id] || {};
             const isPending = !!pendingRuns[t.id];
             const status = isPending ? 'queueing' : normalizeStatus(d);
@@ -149,10 +167,10 @@ export default function PipelineBuilder() {
                   className="accent-accent shrink-0"
                 />
                 <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${STATUS_DOT[status] || STATUS_DOT.idle}`} />
-                <span className="text-base shrink-0">{taskAny.icon as string}</span>
+                <span className="text-base shrink-0">{t.icon}</span>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs text-zinc-200 font-medium truncate">S{t.num}: {t.title}</div>
-                  <div className="text-[9px] text-zinc-500 truncate">{taskAny.actor as string}</div>
+                  <div className="text-[9px] text-zinc-500 truncate">{t.actor}</div>
                 </div>
                 {status !== 'idle' && (
                   <span className={`font-mono text-[8px] uppercase shrink-0 ${
@@ -160,17 +178,16 @@ export default function PipelineBuilder() {
                   }`}>{status}</span>
                 )}
 
-                {/* Run / Cancel on hover */}
                 {isSelected && status === 'idle' && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleRunSingle(t.id); }}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); handleRunSingle(t.id); }}
                     className="opacity-0 group-hover:opacity-100 font-mono text-[9px] text-accent hover:text-white transition-all shrink-0"
                     title="Run this task"
                   >{'\u25b6'}</button>
                 )}
                 {isSelected && status === 'running' && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); cancelTask(t.id); }}
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); cancelTask(t.id); }}
                     className="font-mono text-[9px] text-red-400 hover:text-red-300 transition-all shrink-0"
                     title="Cancel"
                   >{'\u25a0'}</button>
@@ -185,10 +202,10 @@ export default function PipelineBuilder() {
           <label className="block font-mono text-[9px] text-zinc-500 uppercase tracking-[1.5px] mb-1.5">Model</label>
           <select
             value={globalModel}
-            onChange={(e) => setGlobalModel(e.target.value)}
+            onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setGlobalModel(e.target.value)}
             className="w-full bg-elevated border border-border rounded-lg px-2.5 py-2 text-xs text-zinc-200 font-mono"
           >
-            {MODELS.map(m => (
+            {MODELS.map((m: Model) => (
               <option key={m.id} value={m.id}>{m.short}</option>
             ))}
           </select>
@@ -198,31 +215,28 @@ export default function PipelineBuilder() {
         <div className="px-4 pt-2 pb-4">
           <label className="block font-mono text-[9px] text-zinc-500 uppercase tracking-[1.5px] mb-1.5">Add-ons</label>
           <div className="space-y-1">
-            {SKILLS.map(s => {
-              const skillAny = s as Record<string, unknown>;
-              return (
-                <label
-                  key={s.id}
-                  className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-white/[0.03] transition-colors"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedSkills.has(s.id)}
-                    onChange={() => toggleSkill(s.id)}
-                    className="mt-0.5 accent-accent"
-                  />
-                  <span className="pt-0.5 text-sm">{skillAny.icon as string}</span>
-                  <span className="min-w-0">
-                    <span className="block text-xs text-zinc-300">{s.name}</span>
-                    {s.description && (
-                      <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">
-                        {s.description}
-                      </span>
-                    )}
-                  </span>
-                </label>
-              );
-            })}
+            {SKILLS.map((s: Skill) => (
+              <label
+                key={s.id}
+                className="flex items-start gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer hover:bg-white/[0.03] transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedSkills.has(s.id)}
+                  onChange={() => toggleSkill(s.id)}
+                  className="mt-0.5 accent-accent"
+                />
+                <span className="pt-0.5 text-sm">{s.icon}</span>
+                <span className="min-w-0">
+                  <span className="block text-xs text-zinc-300">{s.name}</span>
+                  {s.description && (
+                    <span className="mt-0.5 block text-[10px] leading-relaxed text-zinc-500">
+                      {s.description}
+                    </span>
+                  )}
+                </span>
+              </label>
+            ))}
           </div>
         </div>
       </div>

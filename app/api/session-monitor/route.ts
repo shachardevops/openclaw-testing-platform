@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       const canSwap = !existing.lastSwapAt || Date.now() - existing.lastSwapAt >= SWAP_COOLDOWN_MS;
       if (canSwap) {
         const modelFamily = getModelFamily(currentModel, config.models);
-        const fallbackModel = resolveFallbackModel(modelFamily, fallbackConfig.rules);
+        const fallbackModel = resolveFallbackModel(modelFamily, (fallbackConfig as any).rules);
 
         if (fallbackModel) {
           const template = config.project.messageTemplates?.modelSwap;
