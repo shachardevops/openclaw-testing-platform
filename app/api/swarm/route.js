@@ -1,4 +1,5 @@
 import { getSwarmState, getAgentDetail } from '@/lib/swarm-tracker';
+import { toErrorResponse } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,6 @@ export async function GET(req) {
     const state = getSwarmState();
     return Response.json({ ok: true, ...state });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }

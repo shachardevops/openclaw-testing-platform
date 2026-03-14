@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ask, askClaude, askCodex, getAvailableProviders, askWithGatewayFallback, getDirectAIStats, getDirectAIHistory } from '@/lib/direct-ai';
 import { validateInput } from '@/lib/security-validator';
+import { toErrorResponse, ValidationError, GatewayError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,7 @@ export async function POST(req) {
     const { prompt, provider, taskType, system, model, maxTokens, temperature, gatewayFallback } = body;
 
     if (!prompt || typeof prompt !== 'string') {
-      return NextResponse.json({ ok: false, error: 'prompt is required' }, { status: 400 });
+      throw new ValidationError('prompt is required');
     }
 
     // Validate known fields
@@ -43,7 +44,7 @@ export async function POST(req) {
       { ...(model ? { model } : {}), ...(prompt ? { message: prompt } : {}) }
     );
     if (!validation.valid) {
-      return NextResponse.json({ ok: false, error: 'Validation failed', details: validation.errors }, { status: 400 });
+      throw new ValidationError('Validation failed');
     }
 
     const opts = {
@@ -75,16 +76,11 @@ export async function POST(req) {
     }
 
     if (!result) {
-      return NextResponse.json({
-        ok: false,
-        error: 'No AI provider available. Configure API keys in ~/.openclaw/openclaw.json or set ANTHROPIC_API_KEY / OPENAI_API_KEY env vars.',
-        providers: getAvailableProviders(),
-      }, { status: 503 });
+      throw new GatewayError('No AI provider available. Configure API keys in ~/.openclaw/openclaw.json or set ANTHROPIC_API_KEY / OPENAI_API_KEY env vars.');
     }
 
     return NextResponse.json({ ok: true, result });
   } catch (e) {
-    console.error('[/api/direct-ai] Error:', e.message);
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }

@@ -9,6 +9,10 @@ export function useBridgeStream({ onChunk, onStatusChange }) {
   const retriesRef = useRef(0);
   const esRef = useRef(null);
   const retryTimerRef = useRef(null);
+  const onChunkRef = useRef(onChunk);
+  const onStatusChangeRef = useRef(onStatusChange);
+  onChunkRef.current = onChunk;
+  onStatusChangeRef.current = onStatusChange;
 
   const connect = useCallback(() => {
     // Clean up previous
@@ -30,13 +34,13 @@ export function useBridgeStream({ onChunk, onStatusChange }) {
         if (data?.ok) {
           offsetRef.current = Number(data.nextOffset || offsetRef.current);
           retriesRef.current = 0;
-          onChunk?.(data.text || '');
-          onStatusChange?.('live');
+          onChunkRef.current?.(data.text || '');
+          onStatusChangeRef.current?.('live');
         } else {
-          onStatusChange?.('degraded');
+          onStatusChangeRef.current?.('degraded');
         }
       } catch {
-        onStatusChange?.('parse-error');
+        onStatusChangeRef.current?.('parse-error');
       }
     };
 
@@ -46,15 +50,15 @@ export function useBridgeStream({ onChunk, onStatusChange }) {
       retriesRef.current++;
 
       if (retriesRef.current >= MAX_RETRIES) {
-        onStatusChange?.('offline');
+        onStatusChangeRef.current?.('offline');
         return;
       }
 
       const delay = Math.min(1000 * Math.pow(2, retriesRef.current - 1), 30000);
-      onStatusChange?.(`reconnecting-${retriesRef.current}`);
+      onStatusChangeRef.current?.(`reconnecting-${retriesRef.current}`);
       retryTimerRef.current = setTimeout(connect, delay);
     };
-  }, [onChunk, onStatusChange]);
+  }, []);
 
   useEffect(() => {
     if (typeof EventSource === 'undefined') return;

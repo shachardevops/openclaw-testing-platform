@@ -1,4 +1,5 @@
 import selfHealing from '@/lib/self-healing';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export async function GET() {
     const status = selfHealing.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -20,35 +21,29 @@ export async function POST(request) {
     switch (action) {
       case 'should-retry': {
         const { taskId, failureContext } = data;
-        if (!taskId) {
-          return Response.json({ ok: false, error: 'Missing taskId' }, { status: 400 });
-        }
+        if (!taskId) throw new ValidationError('Missing taskId');
         const result = selfHealing.shouldRetryTask(taskId, failureContext || {});
         return Response.json({ ok: true, ...result });
       }
 
       case 'reset-task': {
         const { taskId } = data;
-        if (!taskId) {
-          return Response.json({ ok: false, error: 'Missing taskId' }, { status: 400 });
-        }
+        if (!taskId) throw new ValidationError('Missing taskId');
         selfHealing.resetTask(taskId);
         return Response.json({ ok: true });
       }
 
       case 'circuit-status': {
         const { name } = data;
-        if (!name) {
-          return Response.json({ ok: false, error: 'Missing circuit breaker name' }, { status: 400 });
-        }
+        if (!name) throw new ValidationError('Missing circuit breaker name');
         const cb = selfHealing.getCircuitBreaker(name);
         return Response.json({ ok: true, ...cb.getStatus() });
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

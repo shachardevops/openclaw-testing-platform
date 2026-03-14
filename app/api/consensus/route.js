@@ -1,4 +1,5 @@
 import consensusValidator from '@/lib/consensus-validator';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export async function GET() {
     const status = consensusValidator.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -20,17 +21,15 @@ export async function POST(request) {
     switch (action) {
       case 'evaluate': {
         const { actionType, context } = data;
-        if (!actionType) {
-          return Response.json({ ok: false, error: 'Missing actionType' }, { status: 400 });
-        }
+        if (!actionType) throw new ValidationError('Missing actionType');
         const result = consensusValidator.evaluate(actionType, context || {});
         return Response.json({ ok: true, ...result });
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

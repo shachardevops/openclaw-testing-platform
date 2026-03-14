@@ -1,5 +1,6 @@
 import { evaluateGates, recordGateResult, getGateStatus, loadQualityGatesConfig } from '@/lib/quality-gates';
 import { reportsDir } from '@/lib/config';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export async function GET() {
     const status = getGateStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -28,9 +29,7 @@ export async function POST(request) {
 
     if (action === 'evaluate') {
       const { taskId, result } = data;
-      if (!taskId || !result) {
-        return Response.json({ ok: false, error: 'Missing taskId or result' }, { status: 400 });
-      }
+      if (!taskId || !result) throw new ValidationError('Missing taskId or result');
 
       const config = loadQualityGatesConfig();
       const evaluation = evaluateGates(taskId, result, reportsDir());
@@ -50,8 +49,8 @@ export async function POST(request) {
       });
     }
 
-    return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+    throw new ValidationError(`Unknown action: ${action}`);
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

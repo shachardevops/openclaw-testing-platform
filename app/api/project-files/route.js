@@ -54,16 +54,23 @@ export async function GET(request) {
     // Single file request
     if (file) {
       const filePath = path.join(dirPath, file);
-      // Prevent path traversal — resolved path must stay within dirPath
-      if (!path.resolve(filePath).startsWith(path.resolve(dirPath) + path.sep) &&
-          path.resolve(filePath) !== path.resolve(dirPath)) {
-        return Response.json({ ok: false, error: 'Invalid file path' }, { status: 400 });
-      }
-      if (!fs.existsSync(filePath)) {
+      // Prevent path traversal — resolve symlinks then check containment
+      let realFilePath;
+      try {
+        realFilePath = fs.realpathSync(filePath);
+      } catch {
         return Response.json({ ok: false, error: `File not found: ${file}` });
       }
-      const content = fs.readFileSync(filePath, 'utf8');
-      const stat = fs.statSync(filePath);
+      const realDirPath = fs.realpathSync(dirPath);
+      if (!realFilePath.startsWith(realDirPath + path.sep) &&
+          realFilePath !== realDirPath) {
+        return Response.json({ ok: false, error: 'Invalid file path' }, { status: 400 });
+      }
+      if (!fs.existsSync(realFilePath)) {
+        return Response.json({ ok: false, error: `File not found: ${file}` });
+      }
+      const content = fs.readFileSync(realFilePath, 'utf8');
+      const stat = fs.statSync(realFilePath);
       return Response.json({
         ok: true,
         file: { name: file, content, size: stat.size, modified: stat.mtime.toISOString() },

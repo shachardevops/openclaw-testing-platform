@@ -15,5 +15,8 @@ datasources:
       connMaxLifetime: 14400
       postgresVersion: 1700  # PostgreSQL 17
     secureJsonData:
+      # NOTE: Grafana provisioning YAML does not support env variable substitution
+      # in secureJsonData. This must match RUVECTOR_DB_PASSWORD in docker-compose.yml.
+      # For production, use Grafana's API or UI to set the password instead.
       password: ruvector_secret
     editable: true

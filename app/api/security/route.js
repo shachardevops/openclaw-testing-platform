@@ -1,4 +1,5 @@
 import { getSecurityStatus, getSecurityEvents } from '@/lib/security-validator';
+import { toErrorResponse } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,6 +18,6 @@ export async function GET(request) {
     const status = getSecurityStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }

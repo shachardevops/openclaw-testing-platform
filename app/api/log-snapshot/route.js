@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { resultsDir } from '@/lib/config';
 import { getProjectConfig } from '@/lib/project-loader';
+import { isIdSafe } from '@/lib/security-validator';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,9 @@ export async function GET(request) {
 
   if (!taskId) {
     return Response.json({ ok: false, error: 'taskId required' }, { status: 400 });
+  }
+  if (!isIdSafe(taskId)) {
+    return Response.json({ ok: false, error: 'Invalid taskId format' }, { status: 400 });
   }
 
   // If findingId given, return specific snapshot

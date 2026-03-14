@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { reportsDir } from '@/lib/config';
+import { isIdSafe } from '@/lib/security-validator';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,17 +13,26 @@ function resolvePath(agentId) {
     try {
       const files = fs.readdirSync(testDir).filter(f => f.endsWith('.md'));
       const match = files.find(f => f.toLowerCase().startsWith(agentId.toLowerCase()));
-      if (match) return path.join(testDir, match);
+      if (match) {
+        const resolved = path.join(testDir, match);
+        if (!resolved.startsWith(testDir)) return null;
+        return resolved;
+      }
     } catch {}
   }
-  return path.join(reportsDir(), `${agentId}.md`);
+  const base = reportsDir();
+  const resolved = path.join(base, `${agentId}.md`);
+  if (!resolved.startsWith(base)) return null;
+  return resolved;
 }
 
 export async function GET(request) {
   const agentId = (new URL(request.url).searchParams.get('agentId') || '').trim();
   if (!agentId) return Response.json({ ok: false, error: 'agentId required' }, { status: 400 });
+  if (!isIdSafe(agentId)) return Response.json({ ok: false, error: 'Invalid agentId format' }, { status: 400 });
 
   const fp = resolvePath(agentId);
+  if (!fp) return Response.json({ ok: false, error: 'Invalid agentId format' }, { status: 400 });
   try {
     const content = fs.readFileSync(fp, 'utf8');
     return Response.json({ ok: true, agentId, path: fp, content });
@@ -35,6 +45,7 @@ export async function GET(request) {
 export async function POST(request) {
   const agentId = (new URL(request.url).searchParams.get('agentId') || '').trim();
   if (!agentId) return Response.json({ ok: false, error: 'agentId required' }, { status: 400 });
+  if (!isIdSafe(agentId)) return Response.json({ ok: false, error: 'Invalid agentId format' }, { status: 400 });
 
   try {
     const { content } = await request.json();

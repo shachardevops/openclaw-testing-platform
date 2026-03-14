@@ -1,5 +1,6 @@
 import learningLoop from '@/lib/learning-loop';
 import { reportsDir } from '@/lib/config';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,7 +14,7 @@ export async function GET() {
     const status = learningLoop.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -33,27 +34,21 @@ export async function POST(request) {
     switch (action) {
       case 'learn-result': {
         const { taskId, result } = data;
-        if (!taskId || !result) {
-          return Response.json({ ok: false, error: 'Missing taskId or result' }, { status: 400 });
-        }
+        if (!taskId || !result) throw new ValidationError('Missing taskId or result');
         learningLoop.learnFromResult(taskId, result, reportsDir());
         return Response.json({ ok: true });
       }
 
       case 'learn-decision': {
         const { decision } = data;
-        if (!decision) {
-          return Response.json({ ok: false, error: 'Missing decision' }, { status: 400 });
-        }
+        if (!decision) throw new ValidationError('Missing decision');
         learningLoop.learnFromOrchestratorDecision(decision);
         return Response.json({ ok: true });
       }
 
       case 'get-task-learnings': {
         const { taskId } = data;
-        if (!taskId) {
-          return Response.json({ ok: false, error: 'Missing taskId' }, { status: 400 });
-        }
+        if (!taskId) throw new ValidationError('Missing taskId');
         const learnings = learningLoop.getTaskLearnings(taskId);
         return Response.json({ ok: true, learnings });
       }
@@ -64,9 +59,9 @@ export async function POST(request) {
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

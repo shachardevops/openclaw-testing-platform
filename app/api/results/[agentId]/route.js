@@ -4,6 +4,7 @@ import { resultsDir } from '@/lib/config';
 import { getTaskIdSet } from '@/lib/project-loader';
 
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 const SAFE_AGENT_ID = /^[a-zA-Z0-9_-]+$/;
 

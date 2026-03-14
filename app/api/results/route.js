@@ -236,7 +236,10 @@ export async function GET() {
         try { stopRecording(recording.taskId); } catch {}
       }
     }
-  } catch {}
+  } catch (e) {
+    console.error('[GET /api/results] Error:', e.message);
+    return Response.json({ ok: false, error: e.message }, { status: 500 });
+  }
 
   return Response.json(results);
 }

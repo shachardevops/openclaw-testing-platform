@@ -3,7 +3,7 @@ export const PROJECT = {
   name: 'OrderTu QA Command Center',
   subtitle: 'Multi-Agent Testing Platform',
   icon: '⚡',
-  workspace: '/Users/shacharcohen/.openclaw/workspace/qa-dashboard',
+  workspace: '~/.openclaw/workspace/qa-dashboard',
 };
 
 // ── Models ──────────────────────────────────────────────────────

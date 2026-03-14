@@ -3,6 +3,8 @@ import { bridgeLogPath } from '@/lib/config';
 import { getControllerSessionId, spawnAgent } from '@/lib/openclaw';
 import { getProjectConfig } from '@/lib/project-loader';
 import { startRecording } from '@/lib/screencast-recorder';
+import { isIdSafe } from '@/lib/security-validator';
+import learningLoop from '@/lib/learning-loop';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,6 +17,7 @@ export async function POST(request) {
   try {
     const { agentId, profile, model, skills } = await request.json();
     if (!agentId) throw new Error('agentId required');
+    if (!isIdSafe(agentId)) return Response.json({ ok: false, error: 'Invalid agentId format' }, { status: 400 });
 
     const sessionId = getControllerSessionId();
     if (!sessionId) throw new Error('controllerSessionId missing in pipeline-config.json');
@@ -39,7 +42,31 @@ export async function POST(request) {
         })
         .join('\n');
       if (descs) skillText = `Add-on instructions:\n${descs}`;
+    }
 
+    // Enrich with learnings from previous runs (best-effort)
+    let learningsText = '';
+    try {
+      const learnings = learningLoop.getTaskLearnings(agentId);
+      if (learnings.length > 0) {
+        const parts = [];
+        for (const l of learnings) {
+          if (l.type === 'known-bugs' && l.items?.length) {
+            parts.push(`Known bugs: ${l.items.map(b => b.title).join(', ')}`);
+          }
+          if (l.type === 'recurring-failures' && l.items?.length) {
+            parts.push(`Recurring failures: ${l.items[0].count} times`);
+          }
+          if (l.type === 'model-recommendation') {
+            parts.push(`Recommended model: ${l.model} (${l.passRate}% pass rate)`);
+          }
+        }
+        if (parts.length) learningsText = `\nPrior learnings:\n${parts.join('\n')}`;
+      }
+    } catch { /* learning loop unavailable */ }
+
+    if (learningsText) {
+      skillText = skillText ? `${skillText}\n${learningsText}` : learningsText;
     }
 
     // Use message template from config, or default

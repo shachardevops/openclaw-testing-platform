@@ -76,7 +76,17 @@ load_env() {
     source .env
     set +a
   else
-    warn "No .env.local or .env found — using defaults (copy .env.example to .env.local)"
+    if [ -f .env.example ]; then
+      log "No .env.local or .env found — copying .env.example to .env.local"
+      cp .env.example .env.local
+      set -a
+      # shellcheck disable=SC1091
+      source .env.local
+      set +a
+      ok "Created .env.local from .env.example"
+    else
+      warn "No .env.local, .env, or .env.example found — using defaults"
+    fi
   fi
 }
 
@@ -220,17 +230,36 @@ ensure_workspace() {
 
   ok "Workspace ready at $workspace"
 
-  # Verify symlinks (non-fatal if they fail)
-  if [ -L "$SCRIPT_DIR/results" ]; then
-    ok "results symlink exists"
-  else
-    warn "results symlink missing — create with: ln -s $workspace/results $SCRIPT_DIR/results"
-  fi
+  # Auto-create symlinks if they don't exist
+  for link_name in results reports-md; do
+    if [ -L "$SCRIPT_DIR/$link_name" ]; then
+      ok "$link_name symlink exists"
+    elif [ -e "$SCRIPT_DIR/$link_name" ]; then
+      warn "$link_name exists but is not a symlink — skipping (remove it manually if needed)"
+    else
+      ln -s "$workspace/$link_name" "$SCRIPT_DIR/$link_name"
+      ok "Created $link_name symlink -> $workspace/$link_name"
+    fi
+  done
 
-  if [ -L "$SCRIPT_DIR/reports-md" ]; then
-    ok "reports-md symlink exists"
-  else
-    warn "reports-md symlink missing — create with: ln -s $workspace/reports-md $SCRIPT_DIR/reports-md"
+  # pipeline-config.json symlink
+  if [ -L "$SCRIPT_DIR/pipeline-config.json" ]; then
+    ok "pipeline-config.json symlink exists"
+  elif [ ! -e "$SCRIPT_DIR/pipeline-config.json" ]; then
+    # Find the first project config that has a pipeline-config.json
+    local pc_target=""
+    for dir in "$SCRIPT_DIR"/config/*/; do
+      if [ -f "${dir}pipeline-config.json" ]; then
+        pc_target="${dir}pipeline-config.json"
+        break
+      fi
+    done
+    if [ -n "$pc_target" ]; then
+      ln -s "$pc_target" "$SCRIPT_DIR/pipeline-config.json"
+      ok "Created pipeline-config.json symlink -> $pc_target"
+    else
+      warn "No pipeline-config.json found in config/*/ — skipping symlink"
+    fi
   fi
 }
 

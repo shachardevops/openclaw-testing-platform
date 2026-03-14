@@ -100,31 +100,43 @@ export function usePipelineRunner({ state, dispatch, addLog, runTask, tasks: TAS
         const t = TASKS.find(x => x.id === ap.currentTaskId);
         addLog('PIPELINE', `Done S${t?.num ?? '?'}: ${nextSt.toUpperCase()}`, nextSt === 'failed' ? 'error' : 'success');
 
-        // Quality gate check via API (non-blocking — warn-only by default)
-        fetch('/api/quality-gates', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'evaluate', taskId: ap.currentTaskId, result: results[ap.currentTaskId] }),
-        }).then(r => r.json()).then(data => {
-          if (data?.ok && !data.passed && data.violations?.length > 0) {
-            const vMsgs = data.violations.map(v => `[${v.rule}] ${v.message}`).join('; ');
-            addLog('GATE', `Quality gate ${data.action === 'blocked' ? 'BLOCKED' : 'WARNING'}: ${vMsgs}`, data.action === 'blocked' ? 'error' : '');
-          }
-        }).catch(() => { /* quality gate API unavailable — continue */ });
+        // Quality gate check — block pipeline if gate returns 'blocked'
+        const completedTaskId = ap.currentTaskId;
+        (async () => {
+          try {
+            const gateRes = await fetch('/api/quality-gates', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'evaluate', taskId: completedTaskId, result: results[completedTaskId] }),
+            });
+            const data = await gateRes.json();
+            if (data?.ok && !data.passed && data.violations?.length > 0) {
+              const vMsgs = data.violations.map(v => `[${v.rule}] ${v.message}`).join('; ');
+              addLog('GATE', `Quality gate ${data.action === 'blocked' ? 'BLOCKED' : 'WARNING'}: ${vMsgs}`, data.action === 'blocked' ? 'error' : '');
+              if (data.action === 'blocked') {
+                addLog('PIPELINE', 'Pipeline stopped by quality gate', 'error');
+                const stopAp = { pipelineId: null, currentTaskId: null, taskIds: null, finished: new Set() };
+                activePipelineRef.current = { ...activePipelineRef.current, ...stopAp };
+                dispatch({ type: 'SET_ACTIVE_PIPELINE', data: stopAp });
+                return; // Don't advance
+              }
+            }
+          } catch { /* quality gate API unavailable — continue */ }
 
-        // Notify learning loop of task completion
-        fetch('/api/learning-loop', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'learn-result', taskId: ap.currentTaskId, result: results[ap.currentTaskId] }),
-        }).catch(() => { /* learning loop unavailable — continue */ });
+          // Notify learning loop of task completion (non-blocking)
+          fetch('/api/learning-loop', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'learn-result', taskId: completedTaskId, result: results[completedTaskId] }),
+          }).catch(() => {});
 
-        const fin = new Set(ap.finished);
-        fin.add(ap.currentTaskId);
-        const newAp = { currentTaskId: null, finished: fin };
-        activePipelineRef.current = { ...activePipelineRef.current, ...newAp };
-        dispatch({ type: 'SET_ACTIVE_PIPELINE', data: newAp });
-        setTimeout(queueNext, 100);
+          const fin = new Set(ap.finished);
+          fin.add(completedTaskId);
+          const newAp = { currentTaskId: null, finished: fin };
+          activePipelineRef.current = { ...activePipelineRef.current, ...newAp };
+          dispatch({ type: 'SET_ACTIVE_PIPELINE', data: newAp });
+          setTimeout(queueNext, 100);
+        })();
       }
     }
 

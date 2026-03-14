@@ -1,4 +1,5 @@
 import taskClaims from '@/lib/task-claims';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export async function GET() {
     const status = taskClaims.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -20,45 +21,37 @@ export async function POST(request) {
     switch (action) {
       case 'claim': {
         const { taskId, owner, ttlMs, force } = data;
-        if (!taskId || !owner) {
-          return Response.json({ ok: false, error: 'Missing taskId or owner' }, { status: 400 });
-        }
+        if (!taskId || !owner) throw new ValidationError('Missing taskId or owner');
         const result = taskClaims.claim(taskId, owner, { ttlMs, force });
         return Response.json(result);
       }
 
       case 'release': {
         const { taskId, owner } = data;
-        if (!taskId || !owner) {
-          return Response.json({ ok: false, error: 'Missing taskId or owner' }, { status: 400 });
-        }
+        if (!taskId || !owner) throw new ValidationError('Missing taskId or owner');
         const result = taskClaims.release(taskId, owner);
         return Response.json(result);
       }
 
       case 'handoff': {
         const { taskId, fromOwner, toOwner } = data;
-        if (!taskId || !fromOwner || !toOwner) {
-          return Response.json({ ok: false, error: 'Missing taskId, fromOwner, or toOwner' }, { status: 400 });
-        }
+        if (!taskId || !fromOwner || !toOwner) throw new ValidationError('Missing taskId, fromOwner, or toOwner');
         const result = taskClaims.handoff(taskId, fromOwner, toOwner);
         return Response.json(result);
       }
 
       case 'check': {
         const { taskId } = data;
-        if (!taskId) {
-          return Response.json({ ok: false, error: 'Missing taskId' }, { status: 400 });
-        }
+        if (!taskId) throw new ValidationError('Missing taskId');
         const owner = taskClaims.isClaimedBy(taskId);
         const claim = taskClaims.getClaim(taskId);
         return Response.json({ ok: true, claimed: !!owner, owner, claim });
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

@@ -241,18 +241,29 @@ export function DashboardProvider({ children }) {
 
   // ── Context value ───────────────────────────────────────────────
 
+  const contextValue = useMemo(() => ({
+    ...state,
+    allPipelines,
+    addLog, clearLog,
+    getTaskModel, setTaskModel,
+    getTaskSkills, attachSkill, detachSkill,
+    runTask, cancelTask,
+    runPipeline, runInlinePipeline, stopPipeline,
+    createPipeline, updatePipeline, deletePipeline,
+    resetAll, cleanAllTasks,
+  }), [
+    state, allPipelines,
+    addLog, clearLog,
+    getTaskModel, setTaskModel,
+    getTaskSkills, attachSkill, detachSkill,
+    runTask, cancelTask,
+    runPipeline, runInlinePipeline, stopPipeline,
+    createPipeline, updatePipeline, deletePipeline,
+    resetAll, cleanAllTasks,
+  ]);
+
   return (
-    <Ctx.Provider value={{
-      ...state,
-      allPipelines,
-      addLog, clearLog,
-      getTaskModel, setTaskModel,
-      getTaskSkills, attachSkill, detachSkill,
-      runTask, cancelTask,
-      runPipeline, runInlinePipeline, stopPipeline,
-      createPipeline, updatePipeline, deletePipeline,
-      resetAll, cleanAllTasks,
-    }}>
+    <Ctx.Provider value={contextValue}>
       {children}
     </Ctx.Provider>
   );

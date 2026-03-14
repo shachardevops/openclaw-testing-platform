@@ -1,4 +1,5 @@
 import auditTrail from '@/lib/audit-trail';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export async function GET(request) {
     const status = auditTrail.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -30,9 +31,7 @@ export async function POST(request) {
     switch (action) {
       case 'replay': {
         const { taskId } = data;
-        if (!taskId) {
-          return Response.json({ ok: false, error: 'Missing taskId' }, { status: 400 });
-        }
+        if (!taskId) throw new ValidationError('Missing taskId');
         const events = auditTrail.replayTask(taskId);
         return Response.json({ ok: true, events });
       }
@@ -44,17 +43,15 @@ export async function POST(request) {
 
       case 'record': {
         const { category, eventAction, eventData, actor } = data;
-        if (!category || !eventAction) {
-          return Response.json({ ok: false, error: 'Missing category or eventAction' }, { status: 400 });
-        }
+        if (!category || !eventAction) throw new ValidationError('Missing category or eventAction');
         const event = auditTrail.record(category, eventAction, eventData || {}, actor || 'api');
         return Response.json({ ok: true, event });
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

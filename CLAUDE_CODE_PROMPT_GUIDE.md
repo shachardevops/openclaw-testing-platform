@@ -55,10 +55,10 @@ Do **not** replace OpenClaw CLI bridge with custom sockets/webhooks unless expli
 
 When starting work, tell Claude to verify these immediately:
 
-- `app/api/orphaned-sessions/route.js` currently uses `const sessions = listSessions();` (promise) and then treats it like an array.
-- `lib/openclaw.js` uses `require('path')` inside ESM-style file; normalize to consistent module style.
 - Keep `runtime = 'nodejs'` on API routes that call `child_process`.
 - Never block long-running OpenClaw call in UI thread; keep spawn/detach for fire-and-forget starts.
+- Validate path-derived inputs (`taskId`, file params) with `isIdSafe()` before `path.join()`.
+- Use `fs.realpathSync()` to resolve symlinks before path traversal checks.
 
 ---
 
@@ -85,10 +85,10 @@ Investigation checklist:
 3) Fix only confirmed issues.
 
 Required fixes (if present):
-- Fix any async bug in orphaned sessions route (listSessions usage).
-- Normalize module usage in lib/openclaw.js (no mixed require in ESM context).
 - Harden error handling around OpenClaw CLI failures (return clear structured JSON errors).
 - Ensure bridge log handling is safe for missing file / offset edges.
+- Validate all path-derived inputs with isIdSafe() before path.join().
+- Use fs.realpathSync() to resolve symlinks before traversal checks.
 
 Validation required:
 - Run lint/type checks if configured.
@@ -131,9 +131,8 @@ Constraints:
 - Keep OpenClaw CLI interaction in lib/openclaw.js.
 
 Focus:
-- Fix async misuse in orphaned sessions API.
-- Fix module consistency issues in lib/openclaw.js.
 - Improve OpenClaw error surfaces (structured errors).
+- Validate path inputs at API boundaries (isIdSafe, realpathSync).
 - Preserve behavior everywhere else.
 PROMPT
 )"

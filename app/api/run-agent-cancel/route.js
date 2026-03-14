@@ -1,5 +1,6 @@
 import { getControllerSessionId, execAgent } from '@/lib/openclaw';
 import { getProjectConfig } from '@/lib/project-loader';
+import { isIdSafe } from '@/lib/security-validator';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,7 @@ export async function POST(request) {
   try {
     const { agentId } = await request.json();
     if (!agentId) throw new Error('agentId is required');
+    if (!isIdSafe(agentId)) return Response.json({ ok: false, error: 'Invalid agentId format' }, { status: 400 });
 
     const sessionId = getControllerSessionId();
     if (!sessionId) throw new Error('controllerSessionId missing in pipeline-config.json');

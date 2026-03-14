@@ -1,4 +1,5 @@
 import vectorMemory from '@/lib/vector-memory';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -12,7 +13,7 @@ export async function GET() {
     const status = vectorMemory.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -33,9 +34,7 @@ export async function POST(request) {
     switch (action) {
       case 'search': {
         const { query, collection, limit } = data;
-        if (!query) {
-          return Response.json({ ok: false, error: 'Missing query' }, { status: 400 });
-        }
+        if (!query) throw new ValidationError('Missing query');
         let results;
         if (collection) {
           results = await vectorMemory.collection(collection).search(query, limit || 10);
@@ -47,9 +46,7 @@ export async function POST(request) {
 
       case 'hybrid-search': {
         const { query, collection, limit } = data;
-        if (!query) {
-          return Response.json({ ok: false, error: 'Missing query' }, { status: 400 });
-        }
+        if (!query) throw new ValidationError('Missing query');
         const coll = collection || 'learnings';
         const results = await vectorMemory.collection(coll).hybridSearch(query, limit || 10);
         return Response.json({ ok: true, results });
@@ -57,9 +54,7 @@ export async function POST(request) {
 
       case 'insert': {
         const { id, text, collection, metadata } = data;
-        if (!id || !text) {
-          return Response.json({ ok: false, error: 'Missing id or text' }, { status: 400 });
-        }
+        if (!id || !text) throw new ValidationError('Missing id or text');
         const coll = collection || 'learnings';
         const result = await vectorMemory.collection(coll).insert(id, text, metadata || {});
         return Response.json({ ok: true, ...result });
@@ -67,53 +62,43 @@ export async function POST(request) {
 
       case 'find-decisions': {
         const { query, limit } = data;
-        if (!query) {
-          return Response.json({ ok: false, error: 'Missing query' }, { status: 400 });
-        }
+        if (!query) throw new ValidationError('Missing query');
         const results = await vectorMemory.findSimilarDecisions(query, limit || 5);
         return Response.json({ ok: true, results });
       }
 
       case 'find-learnings': {
         const { query, limit } = data;
-        if (!query) {
-          return Response.json({ ok: false, error: 'Missing query' }, { status: 400 });
-        }
+        if (!query) throw new ValidationError('Missing query');
         const results = await vectorMemory.findRelevantLearnings(query, limit || 10);
         return Response.json({ ok: true, results });
       }
 
       case 'store-learning': {
         const { id, text, metadata } = data;
-        if (!id || !text) {
-          return Response.json({ ok: false, error: 'Missing id or text' }, { status: 400 });
-        }
+        if (!id || !text) throw new ValidationError('Missing id or text');
         const result = await vectorMemory.storeLearning(id, text, metadata || {});
         return Response.json({ ok: true, ...result });
       }
 
       case 'store-decision': {
         const { id, text, metadata } = data;
-        if (!id || !text) {
-          return Response.json({ ok: false, error: 'Missing id or text' }, { status: 400 });
-        }
+        if (!id || !text) throw new ValidationError('Missing id or text');
         const result = await vectorMemory.storeDecision(id, text, metadata || {});
         return Response.json({ ok: true, ...result });
       }
 
       case 'store-pattern': {
         const { id, text, metadata } = data;
-        if (!id || !text) {
-          return Response.json({ ok: false, error: 'Missing id or text' }, { status: 400 });
-        }
+        if (!id || !text) throw new ValidationError('Missing id or text');
         const result = await vectorMemory.storePattern(id, text, metadata || {});
         return Response.json({ ok: true, ...result });
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }

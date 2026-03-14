@@ -1,4 +1,5 @@
 import tokenTracker from '@/lib/token-tracker';
+import { toErrorResponse, ValidationError } from '@/lib/ruflo/errors';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,7 +9,7 @@ export async function GET() {
     const status = tokenTracker.getStatus();
     return Response.json({ ok: true, ...status });
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 500 });
+    return toErrorResponse(e);
   }
 }
 
@@ -20,9 +21,7 @@ export async function POST(request) {
     switch (action) {
       case 'record': {
         const { taskId, result } = data;
-        if (!taskId || !result) {
-          return Response.json({ ok: false, error: 'Missing taskId or result' }, { status: 400 });
-        }
+        if (!taskId || !result) throw new ValidationError('Missing taskId or result');
         tokenTracker.recordTaskCompletion(taskId, result);
         return Response.json({ ok: true });
       }
@@ -39,9 +38,9 @@ export async function POST(request) {
       }
 
       default:
-        return Response.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
+        throw new ValidationError(`Unknown action: ${action}`);
     }
   } catch (e) {
-    return Response.json({ ok: false, error: e.message }, { status: 400 });
+    return toErrorResponse(e);
   }
 }
