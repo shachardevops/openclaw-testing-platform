@@ -4,21 +4,21 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 
 interface SwarmAgent {
   id: string;
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface SwarmData {
   ok: boolean;
   agents?: SwarmAgent[];
-  topology?: Record<string, unknown>;
-  timeline?: unknown[];
-  stats?: Record<string, unknown>;
-  engine?: Record<string, unknown>;
-  pendingReview?: unknown[];
-  pendingConfirmations?: unknown[];
-  subsystems?: Record<string, unknown>;
-  thresholds?: Record<string, unknown>;
-  agent?: Record<string, unknown>;
+  topology?: Record<string, any>;
+  timeline?: any[];
+  stats?: Record<string, any>;
+  engine?: Record<string, any>;
+  pendingReview?: any[];
+  pendingConfirmations?: any[];
+  subsystems?: Record<string, any>;
+  thresholds?: Record<string, any>;
+  agent?: Record<string, any>;
 }
 
 interface ActionResult {
@@ -27,15 +27,43 @@ interface ActionResult {
   [key: string]: unknown;
 }
 
+export interface UseSwarmReturn {
+  agents: SwarmAgent[];
+  topology: Record<string, any>;
+  timeline: any[];
+  stats: Record<string, any>;
+  engine: Record<string, any>;
+  pendingReview: any[];
+  pendingConfirmations: any[];
+  subsystems: Record<string, any>;
+  thresholds: Record<string, any>;
+  loading: boolean;
+  selectedAgentId: string | null;
+  agentDetail: Record<string, any> | null;
+  selectAgent: (agentId: string) => Promise<void>;
+  pause: () => Promise<ActionResult>;
+  resume: () => Promise<ActionResult>;
+  sendNudge: (sessionId: string) => Promise<ActionResult>;
+  sendSwap: (sessionId: string, targetModel?: string) => Promise<ActionResult>;
+  sendKill: (sessionId: string) => Promise<ActionResult>;
+  sendRecover: (taskId: string) => Promise<ActionResult>;
+  setAutonomyLevel: (level: number) => Promise<ActionResult>;
+  approveRecommendation: (id: string) => Promise<ActionResult>;
+  rejectRecommendation: (id: string) => Promise<ActionResult>;
+  confirmAction: (id: string) => Promise<ActionResult>;
+  denyAction: (id: string) => Promise<ActionResult>;
+  refresh: () => Promise<void>;
+}
+
 /**
  * Hook that polls /api/swarm for unified swarm state.
  * Provides agents, topology, timeline, stats, and engine controls.
  */
-export function useSwarm(enabled = true, interval = 5000) {
+export function useSwarm(enabled = true, interval = 5000): UseSwarmReturn {
   const [data, setData] = useState<SwarmData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [agentDetail, setAgentDetail] = useState<Record<string, unknown> | null>(null);
+  const [agentDetail, setAgentDetail] = useState<Record<string, any> | null>(null);
   const mountedRef = useRef(true);
 
   const fetchSwarm = useCallback(async () => {
@@ -79,7 +107,7 @@ export function useSwarm(enabled = true, interval = 5000) {
   }, [selectedAgentId]);
 
   // Engine actions (proxy to orchestrator API)
-  const sendAction = useCallback(async (action: string, extra: Record<string, unknown> = {}): Promise<ActionResult> => {
+  const sendAction = useCallback(async (action: string, extra: Record<string, any> = {}): Promise<ActionResult> => {
     try {
       const res = await fetch('/api/orchestrator', {
         method: 'POST',

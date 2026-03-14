@@ -7,6 +7,7 @@ export interface MessageTemplates {
   chat?: string;
   kill?: string;
   modelSwap?: string;
+  nudgeCooldownMs?: number;
 }
 
 export interface TargetAppConfig {
@@ -26,12 +27,16 @@ export interface ModelFallback {
 
 export interface SessionManagerEscalation {
   staleThresholdMs?: number;
+  nudgeCooldownMs?: number;
   swapThresholdMs?: number;
   killThresholdMs?: number;
 }
 
 export interface SessionManagerConfig {
+  scanIntervalMs?: number;
+  maxActiveSessions?: number;
   escalation?: SessionManagerEscalation;
+  orphanMaxAgeMs?: number;
 }
 
 export interface DriftDetectionConfig {
@@ -61,10 +66,20 @@ export interface ConsensusConfig {
   maxDecisionHistory?: number;
 }
 
+export interface SelfHealingCircuitBreakerConfig {
+  failureThreshold?: number;
+  resetTimeoutMs?: number;
+  halfOpenMaxAttempts?: number;
+}
+
 export interface SelfHealingConfig {
   enabled?: boolean;
   maxRetries?: number;
+  baseDelayMs?: number;
+  maxDelayMs?: number;
+  jitterFactor?: number;
   initialDelayMs?: number;
+  circuitBreaker?: SelfHealingCircuitBreakerConfig;
   circuitBreakerThreshold?: number;
   circuitBreakerResetMs?: number;
 }
@@ -98,6 +113,16 @@ export interface TokenTrackingConfig {
 
 export interface QualityGatesConfig {
   enabled?: boolean;
+  enforceOnPipeline?: boolean;
+  enforceOnFinalize?: boolean;
+  rules?: {
+    minPassRate?: number;
+    maxP1Bugs?: number;
+    maxFailures?: number;
+    requireReport?: boolean;
+    customChecks?: Array<{ field: string; operator: string; value: any; severity?: string }>;
+  };
+  failAction?: string;
   gates?: QualityGate[];
 }
 
@@ -117,6 +142,18 @@ export interface LearningLoopConfig {
   consolidationThreshold?: number;
 }
 
+export interface OrchestratorConfig {
+  enabled?: boolean;
+  autonomyLevel?: number;
+  recoveryCooldownMs?: number;
+  taskStartGracePeriodMs?: number;
+  maxControllerMessagesPerMinute?: number;
+  aiConsultationEnabled?: boolean;
+  decisionMemoryFile?: string;
+  recoveryTimeoutMs?: number;
+  maxRecoveryAttempts?: number;
+}
+
 export interface ProjectConfig {
   id: string;
   name: string;
@@ -126,6 +163,7 @@ export interface ProjectConfig {
   messageTemplates: MessageTemplates;
   targetApp?: TargetAppConfig;
   modelFallback?: ModelFallback;
+  orchestrator?: OrchestratorConfig;
   sessionManager?: SessionManagerConfig;
   driftDetection?: DriftDetectionConfig;
   auditTrail?: AuditTrailConfig;

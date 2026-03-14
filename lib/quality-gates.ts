@@ -33,7 +33,7 @@ const DEFAULT_GATES: QualityGatesConfig = {
 export function loadQualityGatesConfig(): QualityGatesConfig {
   try {
     const { project } = getProjectConfig();
-    const qg = (project.qualityGates || {}) as any;
+    const qg = project.qualityGates || {};
     return {
       ...DEFAULT_GATES,
       ...qg,

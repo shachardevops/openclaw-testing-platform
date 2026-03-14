@@ -174,7 +174,7 @@ function DecisionRow({ entry }: { entry: HistoryEntry }) {
 }
 
 export default function DirectAITab() {
-  const { providers, stats, history, loading, error, refresh } = useDirectAI(true, 5000) as any;
+  const { providers, stats, history, loading, error, refresh } = useDirectAI(true, 5000);
   const [filter, setFilter] = useState('all');
 
   const filteredHistory = useMemo(() => {

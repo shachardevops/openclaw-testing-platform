@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import type { MessageTemplates } from '@/types/config';
 import sessionManager from './session-manager';
 import { getProjectConfig } from './project-loader';
 import { bridgeLogPath, resultsDir } from './config';
@@ -27,7 +28,7 @@ const AUTONOMY_LEVELS: Record<number, { name: string; autoNudge: boolean; autoSw
 function loadEngineConfig() {
   try {
     const { project } = getProjectConfig();
-    const orch = (project as any).orchestrator || {};
+    const orch = project.orchestrator || {};
     const esc = project.sessionManager?.escalation || {};
     return {
       enabled: orch.enabled ?? true,
@@ -38,11 +39,11 @@ function loadEngineConfig() {
       aiConsultationEnabled: orch.aiConsultationEnabled ?? true,
       decisionMemoryFile: orch.decisionMemoryFile ?? 'memory/decision-memory.json',
       workspace: project.workspace || process.cwd(),
-      messageTemplates: project.messageTemplates || {},
+      messageTemplates: project.messageTemplates || ({} as MessageTemplates),
       staleThresholdMs: esc.staleThresholdMs ?? 180000,
       swapThresholdMs: esc.swapThresholdMs ?? 480000,
       killThresholdMs: esc.killThresholdMs ?? 900000,
-      orphanMaxAgeMs: (project.sessionManager as any)?.orphanMaxAgeMs ?? 1800000,
+      orphanMaxAgeMs: project.sessionManager?.orphanMaxAgeMs ?? 1800000,
       recoveryTimeoutMs: orch.recoveryTimeoutMs ?? 180000,
       maxRecoveryAttempts: orch.maxRecoveryAttempts ?? 3,
     };
@@ -51,7 +52,7 @@ function loadEngineConfig() {
       enabled: true, autonomyLevel: 3, recoveryCooldownMs: 120000,
       taskStartGracePeriodMs: 300000, maxControllerMessagesPerMinute: 6,
       aiConsultationEnabled: true, decisionMemoryFile: 'memory/decision-memory.json',
-      workspace: process.cwd(), messageTemplates: {} as any,
+      workspace: process.cwd(), messageTemplates: {} as MessageTemplates,
       staleThresholdMs: 180000, swapThresholdMs: 480000, killThresholdMs: 900000,
       orphanMaxAgeMs: 1800000, recoveryTimeoutMs: 180000, maxRecoveryAttempts: 3,
     };
@@ -200,7 +201,8 @@ class OrchestratorEngine {
     const perms = this._getAutonomyPerms();
     const permMap: Record<string, string> = { nudge: 'autoNudge', swap: 'autoSwap', kill: 'autoKill', respawn: 'autoRecover', recover: 'autoRecover' };
     const permKey = permMap[actionType];
-    if (!permKey || (perms as any)[permKey]) return true;
+    const permKeyTyped = permKey as keyof typeof perms;
+    if (!permKey || perms[permKeyTyped]) return true;
     const confirmation: PendingConfirmation = {
       id: `conf-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       actionType, context, createdAt: new Date().toISOString(), status: 'pending',
@@ -395,7 +397,7 @@ class OrchestratorEngine {
 
         if (age >= cfg.staleThresholdMs && entry.escalation.level < 1) {
           const lastNudge = entry.escalation.lastNudgeAt || 0;
-          const nudgeCooldown = (cfg.messageTemplates as any)?.nudgeCooldownMs || 300000;
+          const nudgeCooldown = cfg.messageTemplates?.nudgeCooldownMs || 300000;
           if (now - lastNudge >= nudgeCooldown && this._rateLimiter!.canSend() && this._canAutoExecute('nudge', { conditionType: 'stale', target: entry.sessionId, sessionId: entry.sessionId })) {
             entry.escalation.level = 1; entry.escalation.lastNudgeAt = now; entry.escalation.nudgeCount++; this._stats.nudges++;
             const nudgeMsg = sessionManager._sendNudge(entry, cfg);

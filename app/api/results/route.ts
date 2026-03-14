@@ -9,6 +9,7 @@ import learningLoop from '@/lib/learning-loop';
 import { stopRecording, getRecordingStatus, listActiveRecordings } from '@/lib/screencast-recorder';
 import { listSessionsSync } from '@/lib/openclaw';
 import appLogRing from '@/lib/app-log-ring';
+import eventBus from '@/lib/event-bus';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -237,6 +238,11 @@ export async function GET() {
       }
     }
   } catch {}
+
+  // Emit SSE event if any results changed since last poll
+  if (eventBus.listenerCount > 0) {
+    eventBus.emit('results', results);
+  }
 
   return Response.json(results);
 }

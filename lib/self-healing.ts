@@ -37,7 +37,7 @@ function loadHealingConfig(): HealingConfig {
       ...(project.selfHealing || {}),
       circuitBreaker: {
         ...DEFAULT_CONFIG.circuitBreaker,
-        ...((project.selfHealing || {} as any).circuitBreaker || {}),
+        ...((project.selfHealing || {}).circuitBreaker || {}),
       },
     };
   } catch {

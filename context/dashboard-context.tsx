@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useReducer, useCallback, useMemo } from 'react';
+import { createContext, useContext, useReducer, useCallback, useMemo, useRef } from 'react';
 import { useProjectConfig } from '@/context/project-config-context';
 import { usePolling } from '@/hooks/use-polling';
+import { useEventStream } from '@/hooks/use-event-stream';
 import { usePersistence } from '@/hooks/use-persistence';
 import { usePipelineRunner } from '@/hooks/use-pipeline-runner';
 import { useGateway } from '@/hooks/use-gateway';
@@ -205,7 +206,19 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     }
   }, [state.pendingRuns, state.streamingText, addLog, onPollResults]);
 
-  // Poll results: 5s normally, could be faster if tasks are running
+  // SSE: receive push updates for instant results
+  const sseActive = useRef(false);
+  const handleSSEEvent = useCallback((type: string, data: unknown) => {
+    if (type === 'results' && data) {
+      sseActive.current = true;
+      const results = data as ResultsMap;
+      onPollResults(results);
+      dispatch({ type: 'SET_RESULTS', results });
+    }
+  }, [onPollResults]);
+  useEventStream({ onEvent: handleSSEEvent });
+
+  // Poll results: slower when SSE is active (fallback), faster when tasks running
   const hasRunning = useMemo(() => {
     return Object.values(state.results || {}).some(r => r?.status === 'running') ||
       Object.keys(state.pendingRuns || {}).length > 0;

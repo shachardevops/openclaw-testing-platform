@@ -19,19 +19,32 @@ interface ServerActionResponse {
 
 type AppStatus = 'stopped' | 'starting' | 'running' | 'errored';
 
+export interface UseAppLogReturn {
+  lines: string[];
+  status: AppStatus;
+  healthy: boolean | null;
+  serverInfo: { name?: string; port?: string | number; pid?: string | number; [key: string]: unknown } | null;
+  loading: boolean;
+  truncated: boolean;
+  loadingEarlier: boolean;
+  loadEarlier: () => Promise<void>;
+  clearLog: () => void;
+  sendAction: (action: string) => Promise<ServerActionResponse>;
+}
+
 /**
  * Polls /api/app-log at byte offsets and accumulates text.
  * Also polls /api/app-server for status.
  */
 const OLDER_LOG_BYTES = 128 * 1024;
 
-export function useAppLog({ enabled = true } = {}) {
+export function useAppLog({ enabled = true } = {}): UseAppLogReturn {
   const offsetRef = useRef<number>(0);
   const headOffsetRef = useRef<number>(0);
   const [lines, setLines] = useState<string[]>([]);
   const [status, setStatus] = useState<AppStatus>('stopped');
   const [healthy, setHealthy] = useState<boolean | null>(null);
-  const [serverInfo, setServerInfo] = useState<Record<string, unknown> | null>(null);
+  const [serverInfo, setServerInfo] = useState<UseAppLogReturn['serverInfo']>(null);
   const [loading, setLoading] = useState(true);
   const [truncated, setTruncated] = useState(false);
   const [loadingEarlier, setLoadingEarlier] = useState(false);

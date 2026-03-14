@@ -21,7 +21,7 @@ function classifyLine(line: string): LineClass {
 }
 
 export default function AppLogTab({ onLoadingChange }: AppLogTabProps) {
-  const { lines, status, healthy, serverInfo, loading, truncated, loadingEarlier, loadEarlier, clearLog, sendAction } = useAppLog() as any;
+  const { lines, status, healthy, serverInfo, loading, truncated, loadingEarlier, loadEarlier, clearLog, sendAction } = useAppLog();
   const bottomRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);

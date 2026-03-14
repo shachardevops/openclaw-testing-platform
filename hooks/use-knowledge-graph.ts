@@ -110,7 +110,7 @@ export function useKnowledgeGraph(enabled = true, interval = 30000) {
 
   // Build graph from raw data + filters
   const graph = useMemo(
-    () => buildGraph(raw, filters) as any,
+    () => buildGraph(raw, filters),
     [raw, filters]
   );
 

@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import type { MessageTemplates } from '@/types/config';
 import { getControllerSessionId, listSessions, spawnAgent, invalidateSessionsCache } from './openclaw';
 import { bridgeLogPath, resultsDir } from './config';
 import { getProjectConfig } from './project-loader';
@@ -29,12 +30,12 @@ function loadManagerConfig() {
     return {
       ...DEFAULT_CONFIG,
       ...sm,
-      escalation: { ...DEFAULT_CONFIG.escalation, ...((sm as any).escalation || {}) },
+      escalation: { ...DEFAULT_CONFIG.escalation, ...(sm.escalation || {}) },
       workspace: project.workspace || process.cwd(),
       messageTemplates: project.messageTemplates || {},
     };
   } catch {
-    return { ...DEFAULT_CONFIG, workspace: process.cwd(), messageTemplates: {} as any };
+    return { ...DEFAULT_CONFIG, workspace: process.cwd(), messageTemplates: {} as MessageTemplates };
   }
 }
 
@@ -363,11 +364,11 @@ class SessionManager {
         status = 'healthy';
       } else if (taskInfo && taskInfo.status === 'failed') {
         if (taskInfo.isAutoFail) {
-          status = activityAge >= ((cfg.escalation as any).staleThresholdMs || 180000) ? 'stale' : 'healthy';
+          status = activityAge >= (cfg.escalation.staleThresholdMs || 180000) ? 'stale' : 'healthy';
         } else {
           status = 'healthy';
         }
-      } else if (activityAge >= ((cfg.escalation as any).staleThresholdMs || 180000)) {
+      } else if (activityAge >= (cfg.escalation.staleThresholdMs || 180000)) {
         status = 'stale';
       }
 

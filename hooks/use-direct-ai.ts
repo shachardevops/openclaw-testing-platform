@@ -5,32 +5,55 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 interface DirectAIProviders {
   claude: boolean;
   codex: boolean;
-  [key: string]: boolean;
+  defaultClaudeModel?: string;
+  defaultCodexModel?: string;
+  [key: string]: unknown;
 }
 
 interface DirectAIStats {
-  [key: string]: unknown;
+  totalCalls: number;
+  cacheHits: number;
+  claudeCalls: number;
+  codexCalls: number;
+  gatewayFallbacks: number;
+  errors: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  estimatedCostSaved: number;
+  [key: string]: any;
 }
 
 interface DirectAIHistoryEntry {
-  [key: string]: unknown;
+  type?: string;
+  provider?: string;
+  [key: string]: any;
 }
 
 interface TestPromptOptions {
-  [key: string]: unknown;
+  [key: string]: any;
 }
 
 interface TestPromptResult {
   ok: boolean;
   error?: string;
-  [key: string]: unknown;
+  [key: string]: any;
+}
+
+export interface UseDirectAIReturn {
+  providers: DirectAIProviders;
+  stats: DirectAIStats | null;
+  history: DirectAIHistoryEntry[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  testPrompt: (prompt: string, opts?: TestPromptOptions) => Promise<TestPromptResult>;
 }
 
 /**
  * Hook to poll Direct AI provider status and decision history.
  * Provides real-time monitoring of direct SDK vs gateway routing decisions.
  */
-export function useDirectAI(enabled = true, interval = 5000) {
+export function useDirectAI(enabled = true, interval = 5000): UseDirectAIReturn {
   const [providers, setProviders] = useState<DirectAIProviders>({ claude: false, codex: false });
   const [stats, setStats] = useState<DirectAIStats | null>(null);
   const [history, setHistory] = useState<DirectAIHistoryEntry[]>([]);
